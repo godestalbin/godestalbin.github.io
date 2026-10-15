@@ -2333,6 +2333,10 @@ function finishDrawing() {
             canvas.setActiveObject(
                 object
             );
+
+            trackEvent('element_created', {
+                element_type: 'arrow'
+            });
         }
 
     canvas.renderAll();
@@ -2387,6 +2391,10 @@ function finishDrawing() {
                     blur
                 );
 
+                trackEvent('element_created', {
+                    element_type: 'blur'
+                });
+
                 canvas.renderAll();
 
                 saveHistory();
@@ -2412,6 +2420,19 @@ function finishDrawing() {
         canvas.setActiveObject(
             object
         );
+
+        const trackedTypes = {
+        rectangle: 'rectangle',
+        circle: 'circle',
+        felt: 'felt',
+        highlight: 'highlight'
+        };
+
+        if (trackedTypes[currentTool]) {
+            trackEvent('element_created', {
+                element_type: trackedTypes[currentTool]
+            });
+        }
 
         canvas.renderAll();
 
@@ -2616,6 +2637,9 @@ function addTextAt(event) {
         text
     );
 
+    trackEvent('element_created', {
+        element_type: 'text'
+    });
 
     /* =================================================
        SÉLECTION
