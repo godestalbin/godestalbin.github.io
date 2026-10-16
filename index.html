@@ -1,17 +1,27 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<!-- Google Analytics 4 -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<!-- Analytics and advertising are loaded only on a hosted site.
+     This avoids waiting for third-party requests when testing via file:// locally. -->
 <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
+    if (location.protocol !== "file:") {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-KCKN5KPES3');
 
-    gtag('config', 'G-KCKN5KPES3');
+        const gaScript = document.createElement('script');
+        gaScript.async = true;
+        gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-KCKN5KPES3';
+        document.head.appendChild(gaScript);
+
+        const adsScript = document.createElement('script');
+        adsScript.async = true;
+        adsScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6392049906379676';
+        adsScript.crossOrigin = 'anonymous';
+        document.head.appendChild(adsScript);
+    }
 </script>
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6392049906379676"
-     crossorigin="anonymous"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -34,6 +44,7 @@
 <script src="js/ui.js" defer></script>
 <script src="js/shortcuts.js" defer></script>
 <script src="js/main.js" defer></script>
+<script src="js/help.js" defer></script>
 
 </head>
 
@@ -55,6 +66,8 @@
             <button type="button" data-action="save-png">Enregistrer en PNG <kbd>Ctrl+S</kbd></button>
             <div class="menu-separator"></div>
             <button type="button" class="menu-danger" data-action="clear-panel">Clear panel <kbd>Ctrl+Alt+⌫</kbd></button>
+            <div class="menu-separator"></div>
+            <button type="button" id="openHelpButton">Aide</button>
         </div>
     </details>
 
@@ -72,6 +85,7 @@
             <button type="button" data-tool="blur">Blur <kbd>B</kbd></button>
         </div>
     </details>
+
 
     <div class="toolbar-divider"></div>
 
@@ -191,6 +205,21 @@
         </div>
     </div>
 
+</div>
+
+<!-- ==================================================
+     HELP MODAL
+================================================== -->
+<div class="help-modal-backdrop" id="helpModal" hidden>
+    <section class="help-modal" role="dialog" aria-modal="true"
+             aria-labelledby="helpModalTitle">
+        <header class="help-modal-header">
+            <h2 id="helpModalTitle">Fuze Help</h2>
+            <button type="button" class="help-modal-close" id="closeHelpButton"
+                    aria-label="Close help" title="Close">×</button>
+        </header>
+        <iframe id="helpFrame" title="Fuze help and features" src="about:blank"></iframe>
+    </section>
 </div>
 
 <!-- ==================================================

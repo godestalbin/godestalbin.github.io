@@ -11,7 +11,7 @@ document.documentElement.lang = FUZE_LANGUAGE;
 
 const FUZE_I18N = {
     fr: {
-        file: "Fichier", edit: "Édition", openImage: "Ouvrir une image",
+        file: "Fichier", edit: "Édition", help: "Aide", helpFeatures: "Aide et fonctionnalités", openImage: "Ouvrir une image",
         copyAnnotated: "Copier l’image annotée", savePng: "Enregistrer en PNG",
         clearPanel: "Effacer le canvas", select: "Sélection", text: "Texte",
         arrow: "Flèche", rectangle: "Rectangle", circle: "Cercle", felt: "Feutre",
@@ -29,7 +29,7 @@ const FUZE_I18N = {
         addImage: "Ajoutez une image pour commencer", ready: "Prêt"
     },
     en: {
-        file: "File", edit: "Edit", openImage: "Open image",
+        file: "File", edit: "Edit", help: "Help", helpFeatures: "Help & features", openImage: "Open image",
         copyAnnotated: "Copy annotated image", savePng: "Save as PNG",
         clearPanel: "Clear canvas", select: "Select", text: "Text",
         arrow: "Arrow", rectangle: "Rectangle", circle: "Circle", felt: "Felt",
@@ -59,6 +59,8 @@ function applyFuzeLanguage() {
     };
     setSummary("#fileMenu > summary", "file");
     setSummary("#editMenu > summary", "edit");
+    const helpButton = document.getElementById("openHelpButton");
+    if (helpButton) helpButton.textContent = fuzeT("help");
     const menuLabels = [
         ['[data-action="open-image"]', 'openImage'],
         ['[data-action="copy-png"]', 'copyAnnotated'],
