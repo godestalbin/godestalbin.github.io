@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fuze Help – Online Image Annotation Tool</title>
+<meta name="description" content="Learn how to annotate images and screenshots online with Fuze. Add arrows, text, numbered markers, shapes and highlights, blur sensitive details, then copy or save your image as PNG.">
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+:root{--paper:#f5f0e6;--clay:#a86f4d;--pine:#596b4a;--dark:#30352f;--border:#d6cec0}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;font-family:"Work Sans",Arial,sans-serif;color:var(--dark);background:var(--paper)}
+body{padding:clamp(20px,4vw,48px)}
+main{max-width:900px;margin:0 auto}
+.topline{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:24px}
+a{color:#66503d;text-underline-offset:3px}
+h1{font-size:clamp(28px,4vw,42px);line-height:1.12;letter-spacing:-1px;margin:0 0 14px}
+.lead{font-size:18px;line-height:1.65;max-width:760px;margin:0 0 30px}
+h2{font-size:22px;margin:30px 0 14px}
+h3{font-size:16px;margin:0 0 7px}
+p,li{line-height:1.65}
+.features{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.feature{padding:16px 18px;background:rgba(255,255,255,.72);border:1px solid var(--border);border-radius:10px}
+.feature p{margin:0;font-size:14px}
+.steps{padding-left:22px}
+.note{padding:14px 17px;border-left:3px solid var(--pine);background:rgba(89,107,74,.08);border-radius:0 8px 8px 0}
+footer{margin-top:34px;padding-top:18px;border-top:1px solid var(--border);font-size:13px;color:#686c65}
+section[lang="en"],
+footer span[lang="en"] {
+    display: inline;
+}
+
+section[lang="fr"],
+footer span[lang="fr"] {
+    display: none;
+}
+
+html[data-language="fr"] section[lang="en"],
+html[data-language="fr"] footer span[lang="en"] {
+    display: none;
+}
+
+html[data-language="fr"] section[lang="fr"] {
+    display: block;
+}
+
+html[data-language="fr"] footer span[lang="fr"] {
+    display: inline;
+}
+@media(max-width:600px){body{padding:18px}.features{grid-template-columns:1fr}.topline{align-items:flex-start}}
+
+</style>
+<script>
+(function () {
+    const lang = (navigator.language || "en")
+        .toLowerCase()
+        .startsWith("fr") ? "fr" : "en";
+
+    document.documentElement.dataset.language = lang;
+})();
+
+</script>
+</head>
+<body>
+<main>
+
+<section lang="en">
+<h1>Free Online Image Annotation Tool</h1>
+<p class="lead">Fuze is a free online image annotation tool that lets you add arrows, shapes, text and highlights to images and screenshots. Blur sensitive information, adjust annotations and export your work as a PNG image, all directly in your browser.</p>
+<h2>Features</h2>
+<div class="features">
+  <article class="feature"><h3>Arrows</h3><p>Point to specific details in an image and guide the viewer's attention.</p></article>
+  <article class="feature"><h3>Text</h3><p>Add labels, notes and explanations. Adjust the text size and color.</p></article>
+  <article class="feature"><h3>Eyedropper</h3><p>Pick a color directly from the image on the canvas.</p></article>
+  <article class="feature"><h3>Rectangles and circles</h3><p>Outline important areas of an image.</p></article>
+  <article class="feature"><h3>Freehand drawing</h3><p>Mark up an image by drawing freehand with the felt tool.</p></article>
+  <article class="feature"><h3>Highlights</h3><p>Emphasize important information with a translucent highlight.</p></article>
+  <article class="feature"><h3>Blur</h3><p>Obscure details in an image that you do not want to display clearly.</p></article>
+  <article class="feature"><h3>Color and thickness</h3><p>Customize the appearance of annotations with color, stroke thickness and transparency controls.</p></article>
+  <article class="feature"><h3>Zoom and image resizing</h3><p>Adjust the working view and choose a size for images you load.</p></article>
+  <article class="feature"><h3>Copy and export</h3><p>Copy the annotated image to the clipboard or save it as a PNG file.</p></article>
+</div>
+<h2>How to use Fuze</h2>
+<ol class="steps">
+<li>Open or paste an image into Fuze.</li>
+<li>Select an annotation tool from the Edit menu or use its keyboard shortcut.</li>
+<li>Customize color, thickness, transparency or text size where applicable.</li>
+<li>Place and adjust your annotations on the canvas.</li>
+<li>Copy the annotated image or download it as a PNG.</li>
+</ol>
+<h2>Privacy</h2>
+<p class="note">Fuze is designed to work directly in your browser without requiring an account. Its image-annotation workflow does not require uploading your image to a Fuze server.</p>
+</section>
+
+<section lang="fr">
+<h1>Outil gratuit d’annotation d’images en ligne</h1>
+<p class="lead">Fuze est un outil gratuit qui permet d’annoter des images et des captures d’écran directement dans le navigateur. Ajoutez des flèches, des formes, du texte et des surlignages, masquez des informations sensibles avec le flou, puis exportez le résultat au format PNG.</p>
+<h2>Fonctionnalités</h2>
+<div class="features">
+  <article class="feature"><h3>Flèches</h3><p>Pointez des détails précis et guidez le regard vers une zone de l’image.</p></article>
+  <article class="feature"><h3>Texte</h3><p>Ajoutez des légendes, des notes et des explications. Réglez la taille et la couleur du texte.</p></article>
+  <article class="feature"><h3>Pipette</h3><p>Prélevez directement une couleur sur l’image affichée sur le canvas.</p></article>
+  <article class="feature"><h3>Rectangles et cercles</h3><p>Encadrez les zones importantes d’une image.</p></article>
+  <article class="feature"><h3>Dessin à main levée</h3><p>Marquez une image librement avec l’outil feutre.</p></article>
+  <article class="feature"><h3>Surlignage</h3><p>Mettez en évidence des informations avec un surlignage translucide.</p></article>
+  <article class="feature"><h3>Flou</h3><p>Rendez moins lisibles les détails que vous ne souhaitez pas afficher clairement.</p></article>
+  <article class="feature"><h3>Couleur et épaisseur</h3><p>Personnalisez les annotations avec les réglages de couleur, d’épaisseur et de transparence.</p></article>
+  <article class="feature"><h3>Zoom et taille de l’image</h3><p>Ajustez le zoom de travail et choisissez la taille des images chargées.</p></article>
+  <article class="feature"><h3>Copie et export</h3><p>Copiez l’image annotée dans le presse-papiers ou enregistrez-la au format PNG.</p></article>
+</div>
+<h2>Comment utiliser Fuze</h2>
+<ol class="steps">
+<li>Ouvrez ou collez une image dans Fuze.</li>
+<li>Choisissez un outil d’annotation dans le menu Édition ou utilisez son raccourci clavier.</li>
+<li>Personnalisez la couleur, l’épaisseur, la transparence ou la taille du texte selon l’outil.</li>
+<li>Placez et ajustez les annotations sur le canvas.</li>
+<li>Copiez l’image annotée ou téléchargez-la au format PNG.</li>
+</ol>
+<h2>Confidentialité</h2>
+<p class="note">Fuze est conçu pour fonctionner directement dans le navigateur, sans compte utilisateur. Le processus d’annotation ne nécessite pas d’envoyer l’image à un serveur Fuze.</p>
+</section>
+<footer><span lang="en">Fuze — online image annotation tool.</span><span lang="fr">Fuze — outil d’annotation d’images en ligne.</span></footer>
+</main>
+</body>
+</html>
