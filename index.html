@@ -150,68 +150,44 @@
      WORKSPACE
 ================================================== -->
 
-<div
-    class="workspace"
-    id="workspace"
->
+<div class="workspace" id="workspace">
 
     <div class="workspace-content">
-        <div class="ad-layout">
-            <aside class="ad-slot ad-slot-side" aria-label="Emplacement publicitaire gauche">
-                Publicité
-            </aside>
+        <div class="stage" id="stage">
 
-            <div
-                class="stage"
-                id="stage"
-            >
+            <canvas
+                id="canvas"
+                width="1200"
+                height="750"
+            ></canvas>
 
-        <canvas
-            id="canvas"
-            width="1200"
-            height="750"
-        ></canvas>
+            <div id="arrow-handles-layer">
 
+                <div
+                    id="arrowHandleStart"
+                    class="arrow-handle"
+                    title="Début de la flèche"
+                ></div>
 
-        <div
-            id="arrow-handles-layer"
-        >
+                <div
+                    id="arrowHandleEnd"
+                    class="arrow-handle"
+                    title="Pointe de la flèche"
+                ></div>
 
-            <div
-                id="arrowHandleStart"
-                class="arrow-handle"
-                title="Début de la flèche"
-            ></div>
-
-            <div
-                id="arrowHandleEnd"
-                class="arrow-handle"
-                title="Pointe de la flèche"
-            ></div>
-
-        </div>
-
-
-        <div
-            id="emptyMessage"
-            class="empty-message"
-        >
-            Ajoutez une image pour commencer
-        </div>
             </div>
 
-            <aside class="ad-slot ad-slot-side" aria-label="Emplacement publicitaire droit">
-                Publicité
-            </aside>
-        </div>
+            <div
+                id="emptyMessage"
+                class="empty-message"
+            >
+                Ajoutez une image pour commencer
+            </div>
 
-        <div class="ad-slot ad-slot-bottom" aria-label="Emplacement publicitaire sous le canvas">
-            Publicité
         </div>
     </div>
 
 </div>
-
 
 <!-- ==================================================
      STATUS
