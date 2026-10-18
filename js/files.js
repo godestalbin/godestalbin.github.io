@@ -438,7 +438,7 @@ document
 
 
                 link.download =
-                    "annotation.png";
+                    "Fuze - image.png";
 
 
                 document.body.appendChild(
