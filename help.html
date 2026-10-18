@@ -51,14 +51,30 @@ html[data-language="fr"] footer span[lang="fr"] {
 
 </style>
 <script>
-(function () {
-    const lang = (navigator.language || "en")
-        .toLowerCase()
-        .startsWith("fr") ? "fr" : "en";
+    if (location.protocol !== "file:") {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-KCKN5KPES3');
 
-    document.documentElement.dataset.language = lang;
-})();
+        const gaScript = document.createElement('script');
+        gaScript.async = true;
+        gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-KCKN5KPES3';
+        document.head.appendChild(gaScript);
 
+        const adsScript = document.createElement('script');
+        adsScript.async = true;
+        adsScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6392049906379676';
+        adsScript.crossOrigin = 'anonymous';
+        document.head.appendChild(adsScript);
+    }  
+  (function () {
+      const lang = (navigator.language || "en")
+          .toLowerCase()
+          .startsWith("fr") ? "fr" : "en";
+
+      document.documentElement.dataset.language = lang;
+  })();
 </script>
 </head>
 <body>
