@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Politique de confidentialité de Fuze, l’outil en ligne d’annotation d’images.">
+    <title>Confidentialité – Fuze</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --paper: #f5f0e6;
+            --clay: #a86f4d;
+            --pine: #596b4a;
+            --dark: #30352f;
+            --border: #d6cec0;
+        }
+        * { box-sizing: border-box; }
+        html { min-height: 100%; scroll-behavior: smooth; }
+        body {
+            margin: 0;
+            min-height: 100%;
+            font-family: "Work Sans", Arial, sans-serif;
+            background: var(--paper);
+            color: var(--dark);
+            line-height: 1.7;
+        }
+        .site-header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 12px max(20px, calc((100% - 1040px) / 2));
+            background: rgba(255,255,255,.96);
+            border-bottom: 1px solid var(--border);
+            box-shadow: 0 1px 5px rgba(0,0,0,.06);
+        }
+        .brand {
+            color: var(--dark);
+            font-size: 21px;
+            font-weight: 700;
+            letter-spacing: -.5px;
+            text-decoration: none;
+        }
+        .back-link {
+            color: var(--pine);
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .back-link:hover { color: var(--clay); text-decoration: underline; }
+        main {
+            width: min(900px, calc(100% - 36px));
+            margin: 42px auto 64px;
+            padding: clamp(24px, 5vw, 56px);
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 5px 25px rgba(0,0,0,.06);
+        }
+        h1, h2 { line-height: 1.25; }
+        h1 { margin: 0 0 12px; font-size: clamp(30px, 5vw, 42px); letter-spacing: -1px; }
+        h2 { margin: 34px 0 10px; font-size: 22px; }
+        p, li { font-size: 15px; }
+        p { margin: 10px 0 14px; }
+        .intro { color: #62675f; margin-bottom: 28px; }
+        .toc {
+            margin: 28px 0 34px;
+            padding: 20px 24px;
+            background: var(--paper);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        .toc h2 { margin: 0 0 10px; font-size: 18px; }
+        .toc ol { margin: 0; padding-left: 22px; }
+        a { color: var(--pine); text-underline-offset: 3px; }
+        a:hover { color: var(--clay); }
+        .updated { margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--border); color: #6c716b; font-size: 13px; }
+        .return-bottom { margin-top: 28px; }
+        .return-bottom a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 38px;
+            padding: 0 16px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--paper);
+            color: var(--dark);
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+        }
+        .return-bottom a:hover { border-color: var(--clay); color: var(--clay); }
+        footer {
+            padding: 22px 18px 30px;
+            text-align: center;
+            color: #6c716b;
+            font-size: 13px;
+        }
+        footer a { margin: 0 8px; color: inherit; }
+        @media (max-width: 600px) {
+            .site-header { padding: 11px 16px; }
+            main { width: calc(100% - 20px); margin: 18px auto 28px; padding: 22px 18px; border-radius: 8px; }
+            h2 { font-size: 20px; }
+            p, li { font-size: 14px; }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="https://godestalbin.github.io/" aria-label="Fuze – accueil">Fuze</a>
+        <a class="back-link" href="https://godestalbin.github.io/">Retour à Fuze</a>
+    </header>
+
+    <main>
+        <h1>Politique de confidentialité</h1>
+        <p class="intro">Cette politique explique quelles informations peuvent être traitées lorsque vous utilisez Fuze et comment elles sont utilisées.</p>
+
+        <nav class="toc" aria-label="Sommaire">
+            <h2>Sommaire</h2>
+            <ol>
+                <li><a href="#general">Dispositions générales</a></li>
+                <li><a href="#changes">Modifications de la politique</a></li>
+                <li><a href="#consent">Consentement</a></li>
+                <li><a href="#personal-data">Données personnelles</a></li>
+                <li><a href="#non-personal-data">Images, annotations et données techniques</a></li>
+                <li><a href="#cookies">Cookies et technologies similaires</a></li>
+                <li><a href="#use">Utilisation des informations</a></li>
+                <li><a href="#rights">Vos droits et suppression des données</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ol>
+        </nav>
+
+        <section id="general">
+            <h2>1. Dispositions générales</h2>
+            <p>La présente politique de confidentialité concerne le site Fuze accessible à l’adresse <a href="https://godestalbin.github.io/">https://godestalbin.github.io/</a> (ci-après le « Site ») et l’outil d’annotation d’images proposé sur ce site (ci-après le « Service »).</p>
+            <p>Fuze est conçu pour permettre d’annoter des images directement dans le navigateur. Cette politique décrit les traitements susceptibles d’avoir lieu via le Site, notamment ceux liés à son hébergement, à la mesure d’audience et à la publicité.</p>
+            <p>Cette page est une information générale et ne constitue pas un avis juridique. Elle doit être mise à jour si les fonctionnalités ou les services tiers utilisés par Fuze évoluent.</p>
+        </section>
+
+        <section id="changes">
+            <h2>2. Modifications de la politique</h2>
+            <p>Cette politique peut être modifiée afin de refléter les évolutions du Site, du Service ou des obligations applicables. La version publiée sur cette page est la version en vigueur. Nous vous invitons à la consulter périodiquement.</p>
+        </section>
+
+        <section id="consent">
+            <h2>3. Consentement</h2>
+            <p>En utilisant le Site, vous reconnaissez avoir pris connaissance de cette politique. Lorsque la loi exige un consentement préalable, notamment pour certains cookies ou traceurs non essentiels, ceux-ci doivent être activés uniquement selon les modalités de consentement applicables.</p>
+            <p>Le Service est un outil généraliste et n’est pas conçu spécifiquement pour les enfants.</p>
+        </section>
+
+        <section id="personal-data">
+            <h2>4. Données personnelles</h2>
+            <p>Fuze ne nécessite pas la création d’un compte pour utiliser les fonctions d’annotation. L’outil ne comporte pas de formulaire de compte utilisateur.</p>
+            <p>Si vous contactez Fuze par e-mail à <a href="mailto:support@fuze.com">support@fuze.com</a>, votre adresse e-mail et le contenu de votre message seront traités afin de répondre à votre demande et d’assurer le suivi de l’échange. Évitez d’inclure des informations sensibles qui ne sont pas nécessaires à votre demande.</p>
+            <p>L’hébergement du Site et les services tiers utilisés sur la version en ligne peuvent traiter certaines données techniques, telles que des informations de connexion ou le navigateur utilisé, conformément à leurs propres politiques et aux paramètres du service.</p>
+        </section>
+
+        <section id="non-personal-data">
+            <h2>5. Images, annotations et données techniques</h2>
+            <p>Les opérations d’annotation de Fuze sont conçues pour s’effectuer localement dans votre navigateur. Les images que vous ouvrez, ainsi que les annotations que vous ajoutez, ne sont pas envoyées à un serveur Fuze dans le cadre normal de ces opérations. Elles restent sous votre contrôle dans votre navigateur, sauf si vous choisissez vous-même de les partager par un autre moyen.</p>
+            <p>Les fonctions d’export ou de copie créent une image que vous pouvez enregistrer ou copier depuis votre appareil. Fuze ne propose pas de compte utilisateur ni de stockage cloud intégré pour vos projets.</p>
+            <p>Le Site est hébergé par GitHub Pages. L’accès au Site peut entraîner le traitement de données techniques par l’hébergeur, selon ses conditions et sa politique de confidentialité. Les services tiers de mesure d’audience ou de publicité peuvent également traiter des données dans les conditions décrites ci-dessous.</p>
+        </section>
+
+        <section id="cookies">
+            <h2>6. Cookies et technologies similaires</h2>
+            <p>La version hébergée de Fuze peut charger Google Analytics afin de mesurer l’utilisation du Site et comprendre les interactions avec ses fonctionnalités. Google Analytics peut utiliser des cookies ou technologies similaires et traiter des informations techniques ou des événements d’utilisation.</p>
+            <p>Le Site peut également utiliser Google AdSense pour afficher des publicités. Google et ses partenaires peuvent utiliser des cookies ou technologies similaires pour mesurer les annonces et, lorsque cela est autorisé et selon vos choix, personnaliser la publicité.</p>
+            <p>Les scripts d’analyse et de publicité ne sont pas chargés lorsque la page est ouverte localement via une adresse de type <code>file://</code>. Sur la version en ligne, les traitements dépendent de la configuration effective des services et des règles de consentement applicables.</p>
+            <p>Vous pouvez gérer les cookies via les paramètres de votre navigateur. Le blocage de certains cookies peut affecter certaines fonctionnalités ou mesures. Pour en savoir plus, consultez les politiques de confidentialité et les paramètres de Google concernant la publicité et Analytics.</p>
+        </section>
+
+        <section id="use">
+            <h2>7. Utilisation des informations</h2>
+            <p>Les informations susceptibles d’être traitées peuvent servir à :</p>
+            <ul>
+                <li>fournir et maintenir l’accès au Site et au Service ;</li>
+                <li>comprendre la fréquentation et l’utilisation des fonctionnalités de Fuze ;</li>
+                <li>détecter les erreurs, améliorer l’ergonomie et la fiabilité du Service ;</li>
+                <li>afficher et mesurer les publicités, lorsque la publicité est activée ;</li>
+                <li>répondre aux messages envoyés à l’adresse de contact.</li>
+            </ul>
+            <p>Fuze ne vend pas directement les images que vous annotez. Les traitements éventuellement réalisés par des prestataires tiers sont soumis à leurs propres conditions et politiques de confidentialité.</p>
+        </section>
+
+        <section id="rights">
+            <h2>8. Vos droits et suppression des données</h2>
+            <p>Selon la législation applicable, vous pouvez disposer de droits d’accès, de rectification, d’effacement, d’opposition ou de limitation du traitement de vos données personnelles. Pour exercer ces droits ou poser une question sur un traitement, contactez-nous à <a href="mailto:support@fuze.com">support@fuze.com</a>.</p>
+            <p>Fuze ne reçoit normalement pas les fichiers images utilisés dans l’éditeur et ne peut donc pas supprimer à distance une image qui reste sur votre appareil. Pour supprimer une image ou un export, utilisez les fonctions de gestion de fichiers de votre appareil ou de votre navigateur.</p>
+            <p>Pour les données éventuellement détenues par un fournisseur tiers, vous pouvez également devoir adresser votre demande à ce fournisseur, selon le traitement concerné.</p>
+        </section>
+
+        <section id="contact">
+            <h2>9. Contact</h2>
+            <p>Pour toute question concernant cette politique ou le traitement des informations en lien avec Fuze, vous pouvez nous contacter à l’adresse suivante :</p>
+            <p><a href="mailto:support@fuze.com">support@fuze.com</a></p>
+        </section>
+
+        <p class="updated">Dernière mise à jour : 22 octobre 2026.</p>
+        <p class="return-bottom"><a href="https://godestalbin.github.io/">← Retour</a></p>
+    </main>
+
+    <footer>
+        <div>© Fuze</div>
+        <p>
+            <a href="https://godestalbin.github.io/">Accueil</a>
+            <a href="https://godestalbin.github.io/help.html">Aide</a>
+        </p>
+    </footer>
+</body>
+</html>
