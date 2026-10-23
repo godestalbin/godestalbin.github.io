@@ -44,8 +44,13 @@ body {
 }
 .back-link:hover { color: var(--clay); text-decoration: underline; }
 main {
-    width: min(1040px, calc(100% - 36px));
+    width: min(900px, calc(100% - 36px));
     margin: 42px auto 64px;
+    padding: clamp(24px, 5vw, 56px);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 5px 25px rgba(0,0,0,.06);
 }
 .pricing-intro { max-width: 700px; margin: 0 auto 34px; text-align: center; }
 .eyebrow {
@@ -57,7 +62,16 @@ main {
 }
 h1, h2 { line-height: 1.25; }
 h1 { margin: 0 0 14px; font-size: clamp(30px, 5vw, 44px); letter-spacing: -1.2px; }
-.intro { margin: 0 auto; color: var(--muted); font-size: 16px; max-width: 640px; }
+.intro { color: #62675f; margin-bottom: 28px; }
+.toc {
+    margin: 28px 0 34px;
+    padding: 20px 24px;
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+}
+.toc h2 { margin: 0 0 10px; font-size: 18px; }
+.toc ol { margin: 0; padding-left: 22px; }
 .plans {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -149,7 +163,8 @@ h1 { margin: 0 0 14px; font-size: clamp(30px, 5vw, 44px); letter-spacing: -1.2px
     text-decoration: none;
 }
 .return-bottom a:hover { border-color: var(--clay); color: var(--clay); }
-a { text-underline-offset: 3px; }
+a { color: var(--pine); text-underline-offset: 3px; }
+a:hover { color: var(--clay); }
 footer { padding: 22px 18px 30px; text-align: center; color: #6c716b; font-size: 13px; }
 footer p { margin: 8px 0 0; }
 footer a { margin: 0 8px; color: inherit; }
@@ -162,9 +177,131 @@ footer a:hover { color: var(--clay); }
 }
 @media (max-width: 600px) {
     .site-header { padding: 11px 16px; }
-    main { width: calc(100% - 20px); margin: 24px auto 34px; }
+    main { width: calc(100% - 20px); margin: 18px auto 28px; padding: 22px 18px; border-radius: 8px; }
     .intro { font-size: 14px; }
     .plan-name { font-size: 21px; }
     .price-amount { font-size: 38px; }
     .notice { padding: 18px; }
+}
+
+
+/* ===== Formulaire de contact ===== */
+
+#contact-form {
+    max-width: 620px;
+    margin: 0 auto;
+}
+
+.form-group {
+    margin-bottom: 24px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    display: block;
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--dark);
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.form-group textarea {
+    min-height: 150px;
+    resize: vertical;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--pine);
+    box-shadow: 0 0 0 3px rgba(89, 107, 74, .15);
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+    color: #92958e;
+}
+
+.contact-submit {
+    width: 100%;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+/* ===== Popup de confirmation ===== */
+
+.confirmation-dialog {
+    width: min(440px, calc(100% - 32px));
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #fff;
+    color: var(--dark);
+    box-shadow: 0 15px 50px rgba(0, 0, 0, .2);
+}
+
+.confirmation-dialog::backdrop {
+    background: rgba(48, 53, 47, .55);
+    backdrop-filter: blur(3px);
+}
+
+.confirmation-content {
+    padding: 36px 30px 30px;
+    text-align: center;
+}
+
+.confirmation-icon {
+    display: flex;
+    width: 52px;
+    height: 52px;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+    border-radius: 50%;
+    background: var(--paper);
+    color: var(--pine);
+    font-size: 28px;
+    font-weight: 700;
+}
+
+.confirmation-content h2 {
+    margin: 0 0 12px;
+    font-size: 22px;
+}
+
+.confirmation-content p {
+    margin: 0 0 26px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.confirmation-content button {
+    width: 100%;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+@media (max-width: 600px) {
+    .confirmation-content {
+        padding: 28px 22px 22px;
+    }
+
+    .confirmation-content h2 {
+        font-size: 20px;
+    }
 }

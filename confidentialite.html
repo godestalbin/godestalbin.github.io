@@ -8,108 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --paper: #f5f0e6;
-            --clay: #a86f4d;
-            --pine: #596b4a;
-            --dark: #30352f;
-            --border: #d6cec0;
-        }
-        * { box-sizing: border-box; }
-        html { min-height: 100%; scroll-behavior: smooth; }
-        body {
-            margin: 0;
-            min-height: 100%;
-            font-family: "Work Sans", Arial, sans-serif;
-            background: var(--paper);
-            color: var(--dark);
-            line-height: 1.7;
-        }
-        .site-header {
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 20px;
-            padding: 12px max(20px, calc((100% - 1040px) / 2));
-            background: rgba(255,255,255,.96);
-            border-bottom: 1px solid var(--border);
-            box-shadow: 0 1px 5px rgba(0,0,0,.06);
-        }
-        .brand {
-            color: var(--dark);
-            font-size: 21px;
-            font-weight: 700;
-            letter-spacing: -.5px;
-            text-decoration: none;
-        }
-        .back-link {
-            color: var(--pine);
-            font-size: 14px;
-            font-weight: 600;
-            text-decoration: none;
-        }
-        .back-link:hover { color: var(--clay); text-decoration: underline; }
-        main {
-            width: min(900px, calc(100% - 36px));
-            margin: 42px auto 64px;
-            padding: clamp(24px, 5vw, 56px);
-            background: #fff;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            box-shadow: 0 5px 25px rgba(0,0,0,.06);
-        }
-        h1, h2 { line-height: 1.25; }
-        h1 { margin: 0 0 12px; font-size: clamp(30px, 5vw, 42px); letter-spacing: -1px; }
-        h2 { margin: 34px 0 10px; font-size: 22px; }
-        p, li { font-size: 15px; }
-        p { margin: 10px 0 14px; }
-        .intro { color: #62675f; margin-bottom: 28px; }
-        .toc {
-            margin: 28px 0 34px;
-            padding: 20px 24px;
-            background: var(--paper);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-        }
-        .toc h2 { margin: 0 0 10px; font-size: 18px; }
-        .toc ol { margin: 0; padding-left: 22px; }
-        a { color: var(--pine); text-underline-offset: 3px; }
-        a:hover { color: var(--clay); }
-        .updated { margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--border); color: #6c716b; font-size: 13px; }
-        .return-bottom { margin-top: 28px; }
-        .return-bottom a {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 38px;
-            padding: 0 16px;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            background: var(--paper);
-            color: var(--dark);
-            font-size: 14px;
-            font-weight: 600;
-            text-decoration: none;
-        }
-        .return-bottom a:hover { border-color: var(--clay); color: var(--clay); }
-        footer {
-            padding: 22px 18px 30px;
-            text-align: center;
-            color: #6c716b;
-            font-size: 13px;
-        }
-        footer a { margin: 0 8px; color: inherit; }
-        @media (max-width: 600px) {
-            .site-header { padding: 11px 16px; }
-            main { width: calc(100% - 20px); margin: 18px auto 28px; padding: 22px 18px; border-radius: 8px; }
-            h2 { font-size: 20px; }
-            p, li { font-size: 14px; }
-        }
-    </style>
+    <link rel="stylesheet" href="page.css">
 </head>
 <body>
     <header class="site-header">
@@ -210,7 +109,7 @@
         <div>© Fuze</div>
         <p>
             <a href="https://godestalbin.github.io/">Accueil</a>
-            <a href="https://godestalbin.github.io/help.html">Aide</a>
+            <a href="https://godestalbin.github.io/fuze-documentation.html">Aide</a>
         </p>
     </footer>
 </body>

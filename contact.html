@@ -1,0 +1,141 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Contactez l'équipe Fuze pour toute question ou suggestion.">
+    <title>Contact – Fuze</title>
+
+    <link rel="stylesheet" href="page.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <header class="site-header">
+        <a class="brand" href="index.html">Fuze</a>
+        <a class="back-link" href="index.html">← Retour à Fuze</a>
+    </header>
+
+    <main>
+        <div class="pricing-intro">
+            <p class="eyebrow">CONTACT</p>
+            <h1>Nous contacter</h1>
+            <p class="intro">
+                Une question, une suggestion ou un problème ?
+                Envoyez-nous un message à l'aide du formulaire ci-dessous.
+            </p>
+        </div>
+
+        <form id="contact-form">
+            <div class="form-group">
+                <label for="subject">Votre demande</label>
+                <select id="subject" name="subject" required>
+                    <option value="" disabled selected>Choisissez un sujet</option>
+                    <option value="Question">Question</option>
+                    <option value="Problème technique">Problème technique</option>
+                    <option value="Suggestion">Suggestion</option>
+                    <option value="Autre">Autre</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea
+                    id="description"
+                    name="description"
+                    rows="6"
+                    placeholder="Décrivez votre demande..."
+                    required
+                ></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Mail</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    placeholder="vous@exemple.fr"
+                    autocomplete="email"
+                    required
+                >
+            </div>
+
+            <button type="submit" class="plan-button plan-button-primary contact-submit">
+                Envoyer
+            </button>
+        </form>
+
+        <div class="return-bottom">
+            <a href="index.html">Retour à Fuze</a>
+        </div>
+    </main>
+
+    <footer>
+        <p>
+            <a href="confidentialite.html">Confidentialité</a>
+            <a href="tarifs.html">Tarifs</a>
+            <a href="fuze-documentation.html">Aide</a>
+        </p>
+        <p>© Fuze</p>
+    </footer>
+
+    <!-- Popup de confirmation -->
+    <dialog id="confirmation-dialog" class="confirmation-dialog">
+        <div class="confirmation-content">
+            <div class="confirmation-icon" aria-hidden="true">✓</div>
+            <h2>Message a bien été envoyé</h2>
+            <p>
+                Votre demande a bien été prise en compte.
+                Nous vous remercions.
+            </p>
+            <button type="button" id="confirmation-close"
+                    class="plan-button plan-button-primary">
+                Fermer
+            </button>
+        </div>
+    </dialog>
+
+    <script>
+        "use strict";
+
+        const form = document.getElementById("contact-form");
+        const dialog = document.getElementById("confirmation-dialog");
+        const closeButton = document.getElementById("confirmation-close");
+
+        form.addEventListener("submit", function (event) {
+            event.preventDefault();
+
+            if (!form.reportValidity()) {
+                return;
+            }
+
+            dialog.showModal();
+        });
+
+        function closeConfirmation() {
+            if (dialog.open) {
+                dialog.close();
+            }
+        }
+
+        closeButton.addEventListener("click", closeConfirmation);
+
+        // Fermer en cliquant sur le fond autour du popup.
+        dialog.addEventListener("click", function (event) {
+            if (event.target === dialog) {
+                closeConfirmation();
+            }
+        });
+
+        // Le formulaire est vidé après la fermeture du popup.
+        dialog.addEventListener("close", function () {
+            form.reset();
+        });
+    </script>
+
+</body>
+</html>
