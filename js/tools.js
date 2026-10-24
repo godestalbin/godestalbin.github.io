@@ -175,6 +175,90 @@ function clamp(
    OUTIL / SÉLECTION
 ===================================================== */
 
+function addBorderToSelectedImage() {
+    const image = canvas.getActiveObject();
+    if (!image || image.type !== "image") {
+        updateStatus("Sélectionnez d’abord une image");
+        return;
+    }
+
+    // Reuse an existing border instead of creating duplicates.
+    if (image.fuzeBorderId) {
+        const existingBorder = canvas.getObjects().find(obj => obj.fuzeBorderOwnerId === image.fuzeBorderId);
+        if (existingBorder) {
+            canvas.remove(existingBorder);
+            canvas.requestRenderAll();
+            updateStatus("Bordure supprimée");
+            return;
+        }
+    }
+
+    const id = `fuze-border-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    image.fuzeBorderId = id;
+    const bounds = image.getBoundingRect();
+    const width = getStrokeWidth();
+    const strokeWidth = width;
+
+    const border = new fabric.Rect({
+        left: bounds.left - strokeWidth,
+        top: bounds.top - strokeWidth,
+        width: Math.max(1, bounds.width + strokeWidth),
+        height: Math.max(1, bounds.height + strokeWidth),
+        rx: Math.min(14, Math.max(4, Math.min(bounds.width, bounds.height) * 0.04)),
+        ry: Math.min(14, Math.max(4, Math.min(bounds.width, bounds.height) * 0.04)),
+        fill: "rgba(0,0,0,0)",
+        stroke: getColor(),
+        strokeWidth: width,
+        opacity: getStrokeOpacity(),
+        selectable: false,
+        evented: false,
+        objectCaching: false,
+        fuzeTool: "border",
+        fuzeBorderOwnerId: id
+    });
+    canvas.add(border);
+    // Keep the image above its border and preserve all other overlay ordering.
+    // canvas.moveObjectTo(image, Math.max(0, canvas.getObjects().indexOf(border) + 1));
+    const objects = canvas.getObjects();
+    const imageIndex = objects.indexOf(image);
+
+    if (imageIndex !== -1) {
+        canvas.moveObjectTo(border, imageIndex + 1);
+    }
+    canvas.setActiveObject(image);
+    canvas.requestRenderAll();
+    saveHistory();
+    updateStatus("Bordure ajoutée");
+}
+
+function syncImageBorder(image) {
+    if (!image || image.type !== "image" || !image.fuzeBorderId) return;
+    const border = canvas.getObjects().find(obj => obj.fuzeBorderOwnerId === image.fuzeBorderId);
+    if (!border) return;
+    const bounds = image.getBoundingRect();
+    const width = Number(border.strokeWidth) || 1;
+    const strokeWidth = width;
+    const radius = Math.min(14, Math.max(4, Math.min(bounds.width, bounds.height) * 0.04));
+    
+    border.set({
+        left: bounds.left - strokeWidth,
+        top: bounds.top - strokeWidth,
+        width: Math.max(1, bounds.width + strokeWidth),
+        height: Math.max(1, bounds.height + strokeWidth),
+        rx: radius,
+        ry: radius
+    });
+    border.setCoords();
+}
+
+function updateImageBorderStyle(image, color = getColor(), width = getStrokeWidth()) {
+    if (!image || image.type !== "image" || !image.fuzeBorderId) return;
+    const border = canvas.getObjects().find(obj => obj.fuzeBorderOwnerId === image.fuzeBorderId);
+    if (!border) return;
+    border.set({ stroke: color, strokeWidth: width, opacity: getStrokeOpacity() });
+    syncImageBorder(image);
+}
+
 function setTool(tool) {
 
     currentTool = tool;
@@ -2724,6 +2808,16 @@ canvas.on("text:editing:exited", event => {
     editingTextChanged = false;
 });
 
+
+// Keep borders attached to their images while moving, scaling, or rotating.
+["object:moving", "object:scaling", "object:rotating", "object:modified"].forEach(eventName => {
+    canvas.on(eventName, event => {
+        if (event.target && event.target.type === "image") {
+            syncImageBorder(event.target);
+            canvas.requestRenderAll();
+        }
+    });
+});
 
 /* =====================================================
    SÉLECTION FABRIC

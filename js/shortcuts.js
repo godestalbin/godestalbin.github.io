@@ -4,87 +4,187 @@
    ORDRE DES ÉLÉMENTS
 ===================================================== */
 
-function bringSelectedObjectForward() {
 
-    const object =
-        canvas.getActiveObject();
+function getSelectedObjectAndBorder() {
+    const object = canvas.getActiveObject();
 
     if (!object) {
+        return null;
+    }
+
+    const objects = canvas.getObjects();
+
+    // Si la bordure est sélectionnée, retrouver son image.
+    let image = object;
+
+    if (object.fuzeBorderOwnerId) {
+        image = objects.find(
+            obj => obj.fuzeBorderId === object.fuzeBorderOwnerId
+        );
+
+        if (!image) {
+            return { objects: [object] };
+        }
+    }
+
+    // Retrouver la bordure associée à l'image.
+    const border = image.fuzeBorderId
+        ? objects.find(
+            obj => obj.fuzeBorderOwnerId === image.fuzeBorderId
+        )
+        : null;
+
+    return {
+        objects: border ? [image, border] : [object]
+    };
+}
+
+
+
+function getSelectedObjectsForZOrder() {
+    const selected = canvas.getActiveObject();
+
+    if (!selected) {
+        return null;
+    }
+
+    const objects = canvas.getObjects();
+
+    // Si la bordure est sélectionnée, retrouver son image.
+    let image = selected;
+
+    if (selected.fuzeBorderOwnerId) {
+        image = objects.find(
+            obj => obj.fuzeBorderId === selected.fuzeBorderOwnerId
+        );
+
+        if (!image) {
+            return [selected];
+        }
+    }
+
+    // Retrouver la bordure de l'image.
+    const border = image.fuzeBorderId
+        ? objects.find(
+            obj => obj.fuzeBorderOwnerId === image.fuzeBorderId
+        )
+        : null;
+
+    // L'image doit rester juste en dessous de sa bordure.
+    return border ? [image, border] : [selected];
+}
+
+
+
+function moveSelectedObjectsInZOrder(direction) {
+    const selectedGroup = getSelectedObjectsForZOrder();
+
+    if (!selectedGroup) {
         return;
     }
 
+    const objects = canvas.getObjects();
 
-    const objects =
-        canvas.getObjects();
+    function getFrameGroup(object) {
+        let image = object;
 
-    const index =
-        objects.indexOf(object);
+        // Si l'objet est la bordure, retrouver son image.
+        if (object.fuzeBorderOwnerId) {
+            image = objects.find(
+                obj => obj.fuzeBorderId === object.fuzeBorderOwnerId
+            );
 
+            if (!image) {
+                return [object];
+            }
+        }
 
-    /*
-       Déjà tout devant.
-    */
-    if (
-        index < 0 ||
-        index >= objects.length - 1
-    ) {
-        return;
+        // Retrouver la bordure de l'image.
+        const border = image.fuzeBorderId
+            ? objects.find(
+                obj => obj.fuzeBorderOwnerId === image.fuzeBorderId
+            )
+            : null;
+
+        return (border ? [image, border] : [image]).sort(
+            (a, b) => objects.indexOf(a) - objects.indexOf(b)
+        );
     }
 
-
-    /*
-       Monter d'un niveau.
-    */
-    canvas.bringObjectForward(
-        object
+    const group = [...new Set(selectedGroup)].sort(
+        (a, b) => objects.indexOf(a) - objects.indexOf(b)
     );
 
+    if (group.some(obj => !objects.includes(obj))) {
+        return;
+    }
 
-    canvas.renderAll();
+    const firstIndex = Math.min(
+        ...group.map(obj => objects.indexOf(obj))
+    );
 
+    const lastIndex = Math.max(
+        ...group.map(obj => objects.indexOf(obj))
+    );
+
+    // Trouver le cadre immédiatement voisin.
+    const neighborIndex = direction === "up"
+        ? lastIndex + 1
+        : firstIndex - 1;
+
+    if (neighborIndex < 0 || neighborIndex >= objects.length) {
+        return;
+    }
+
+    const neighborGroup = getFrameGroup(objects[neighborIndex]);
+
+    // Ne pas déplacer un groupe par rapport à lui-même.
+    if (neighborGroup.some(obj => group.includes(obj))) {
+        return;
+    }
+
+    // Retirer les deux groupes de la pile.
+    const movingObjects = new Set([...group, ...neighborGroup]);
+
+    const remaining = objects.filter(
+        obj => !movingObjects.has(obj)
+    );
+
+    // Calculer la position de réinsertion.
+    const allIndices = [...group, ...neighborGroup].map(
+        obj => objects.indexOf(obj)
+    );
+
+    const insertIndex = objects
+        .slice(0, Math.min(...allIndices))
+        .filter(obj => !movingObjects.has(obj))
+        .length;
+
+    // Les groupes sont échangés en une seule pression.
+    const newOrder = direction === "up"
+        ? [...neighborGroup, ...group]
+        : [...group, ...neighborGroup];
+
+    remaining.splice(insertIndex, 0, ...newOrder);
+
+    newOrder.forEach((obj, index) => {
+        canvas.moveObjectTo(obj, remaining.indexOf(obj));
+    });
+
+    canvas.requestRenderAll();
     saveHistory();
 }
 
 
+
+function bringSelectedObjectForward() {
+    moveSelectedObjectsInZOrder("up");
+}
+
+
 function sendSelectedObjectBackward() {
-
-    const object =
-        canvas.getActiveObject();
-
-    if (!object) {
-        return;
-    }
-
-
-    const objects =
-        canvas.getObjects();
-
-    const index =
-        objects.indexOf(object);
-
-
-    /*
-       Déjà tout derrière.
-    */
-    if (
-        index <= 0
-    ) {
-        return;
-    }
-
-
-    /*
-       Descendre d'un niveau.
-    */
-    canvas.sendObjectBackwards(
-        object
-    );
-
-
-    canvas.renderAll();
-
-    saveHistory();
-}    
+    moveSelectedObjectsInZOrder("down");
+}
 
 /* =====================================================
    MENUS FILE / EDIT
@@ -273,6 +373,14 @@ document.addEventListener("keydown", event => {
     if (event.ctrlKey && event.altKey && !event.shiftKey && key === "backspace") {
         event.preventDefault();
         document.getElementById("clearButton").click();
+        return;
+    }
+
+    // Bordure : action sur l’image actuellement sélectionnée.
+    if (!event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && key === "o") {
+        event.preventDefault();
+        addBorderToSelectedImage();
+        document.querySelectorAll(".toolbar-menu").forEach(menu => menu.removeAttribute("open"));
         return;
     }
 

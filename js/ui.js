@@ -162,6 +162,23 @@ function syncControlsFromSelectedObject() {
 
 
     /* -------------------------------------------------
+       IMAGE AVEC BORDURE ASSOCIÉE
+    ------------------------------------------------- */
+
+    if (object.type === "image" && object.fuzeBorderId) {
+        const border = canvas.getObjects().find(item => item.fuzeBorderOwnerId === object.fuzeBorderId);
+        if (border) {
+            if (typeof border.stroke === "string" && /^#[0-9a-f]{3,8}$/i.test(border.stroke)) {
+                colorInput.value = border.stroke;
+            }
+            if (Number.isFinite(Number(border.strokeWidth))) {
+                strokeWidthInput.value = String(border.strokeWidth);
+            }
+        }
+        return;
+    }
+
+    /* -------------------------------------------------
        TEXTE
     ------------------------------------------------- */
 
@@ -195,6 +212,18 @@ function syncControlsFromSelectedObject() {
         return;
     }
 
+
+    /* -------------------------------------------------
+       IMAGE AVEC BORDURE ASSOCIÉE
+    ------------------------------------------------- */
+
+    if (object.type === "image") {
+        updateImageBorderStyle(object, getColor(), getStrokeWidth());
+        canvas.requestRenderAll();
+        saveHistory();
+        updateStatus("Bordure de l’image modifiée");
+        return;
+    }
 
     /* -------------------------------------------------
        RECTANGLE / CERCLE
@@ -409,6 +438,18 @@ function updateSelectedObject() {
 
 
     /* -------------------------------------------------
+       IMAGE AVEC BORDURE ASSOCIÉE
+    ------------------------------------------------- */
+
+    if (object.type === "image") {
+        updateImageBorderStyle(object, getColor(), getStrokeWidth());
+        canvas.requestRenderAll();
+        saveHistory();
+        updateStatus("Bordure de l’image modifiée");
+        return;
+    }
+
+    /* -------------------------------------------------
        RECTANGLE / CERCLE
     ------------------------------------------------- */
 
@@ -518,3 +559,10 @@ workspace.addEventListener(
 );
 
 
+
+
+// Border is an action on the currently selected image, not a drawing mode.
+document.querySelector('[data-action="add-border"]')?.addEventListener("click", () => {
+    addBorderToSelectedImage();
+    document.querySelectorAll(".toolbar-menu").forEach(menu => menu.removeAttribute("open"));
+});

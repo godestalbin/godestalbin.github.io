@@ -19,6 +19,8 @@ const SERIALIZED_PROPERTIES = [
     "fuzeTool",
     "blurType",
     "blurRadius",
+    "fuzeBorderId",
+    "fuzeBorderOwnerId",
 
 ];
 
