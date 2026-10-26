@@ -305,3 +305,15 @@ footer a:hover { color: var(--clay); }
         font-size: 20px;
     }
 }
+
+/* Mise en forme de la documentation Fuze */
+.help-section { margin: 34px 0; }
+.help-section h2 { margin: 0 0 18px; font-size: clamp(23px, 3vw, 30px); }
+.help-section h3 { margin: 26px 0 10px; color: var(--pine); font-size: 19px; }
+.help-section p { margin: 12px 0; }
+.help-section ul { padding-left: 24px; }
+.help-section li { margin: 8px 0; }
+.help-illustration { display: block; width: 100%; height: auto; margin: 24px auto 0; border-radius: 8px; }
+@media (max-width: 600px) {
+    .help-section { margin: 26px 0; }
+}
