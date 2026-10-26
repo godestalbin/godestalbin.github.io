@@ -93,12 +93,24 @@ document.addEventListener("keydown", event => {
 function syncControlsFromSelectedObject() {
 
     const object = canvas.getActiveObject();
+    const selectedObjects = canvas.getActiveObjects();
     syncThicknessControl();
 
     if (!object) return;
 
 
-    const selectedObjects = canvas.getActiveObjects();
+    // Synchronise la transparence affichée avec l'objet sélectionné.
+    // Pour une image avec bordure liée, la transparence correspond à la bordure.
+    let opacityObject = selectedObjects.length > 1 ? selectedObjects[0] : object;
+    if (opacityObject.type === "image" && opacityObject.fuzeBorderId) {
+        const linkedBorder = canvas.getObjects().find(
+            item => item.fuzeBorderOwnerId === opacityObject.fuzeBorderId
+        );
+        if (linkedBorder) opacityObject = linkedBorder;
+    }
+    const opacity = Number.isFinite(opacityObject.opacity) ? opacityObject.opacity : 1;
+    strokeOpacityInput.value = String(Math.max(10, Math.min(100, Math.round(opacity * 100))));
+    updateStrokeOpacityLabel();
     if (selectedObjects.length > 1) {
         const newWidth = getStrokeWidth();
         const newColor = getColor();
@@ -398,7 +410,8 @@ function updateSelectedObject() {
     ) {
 
         object.set({
-            fill: getColor()
+            fill: getColor(),
+             opacity: getStrokeOpacity()
         });
 
 
@@ -503,6 +516,66 @@ function updateSelectedObject() {
 /* =====================================================
    CONTRÔLES DE STYLE
 ===================================================== */
+
+const colorPickerWrap = document.getElementById("colorPickerWrap");
+const colorPickerPopup = document.getElementById("colorPickerPopup");
+const customColorInput = document.getElementById("customColorInput");
+
+function setColorPickerOpen(open) {
+    colorPickerPopup.hidden = !open;
+    colorInput.setAttribute("aria-expanded", String(open));
+    if (open) {
+        customColorInput.value = colorInput.value;
+        colorPickerPopup.querySelectorAll(".color-swatch").forEach(swatch => {
+            swatch.setAttribute("aria-pressed", String(swatch.dataset.color.toLowerCase() === colorInput.value.toLowerCase()));
+        });
+    }
+}
+
+// Keep the existing color control, but open our palette instead of the browser popup.
+colorInput.addEventListener("click", event => {
+    event.preventDefault();
+    setColorPickerOpen(colorPickerPopup.hidden);
+});
+colorInput.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        setColorPickerOpen(colorPickerPopup.hidden);
+    }
+    if (event.key === "Escape") setColorPickerOpen(false);
+});
+
+colorPickerPopup.querySelectorAll(".color-swatch").forEach(swatch => {
+    swatch.addEventListener("click", () => {
+        colorInput.value = swatch.dataset.color;
+        customColorInput.value = swatch.dataset.color;
+        colorPickerPopup.querySelectorAll(".color-swatch").forEach(item => item.setAttribute("aria-pressed", String(item === swatch)));
+        colorInput.dispatchEvent(new Event("input", { bubbles: true }));
+        colorInput.dispatchEvent(new Event("change", { bubbles: true }));
+        setColorPickerOpen(false);
+        colorInput.focus();
+    });
+});
+
+customColorInput.addEventListener("input", () => {
+    colorInput.value = customColorInput.value;
+    colorPickerPopup.querySelectorAll(".color-swatch").forEach(swatch => {
+        swatch.setAttribute("aria-pressed", String(swatch.dataset.color.toLowerCase() === colorInput.value.toLowerCase()));
+    });
+    colorInput.dispatchEvent(new Event("input", { bubbles: true }));
+});
+customColorInput.addEventListener("change", () => {
+    colorInput.value = customColorInput.value;
+    colorInput.dispatchEvent(new Event("change", { bubbles: true }));
+    setColorPickerOpen(false);
+});
+
+document.addEventListener("pointerdown", event => {
+    if (!colorPickerWrap.contains(event.target)) setColorPickerOpen(false);
+});
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !colorPickerPopup.hidden) setColorPickerOpen(false);
+});
 
 colorInput.addEventListener(
     "input",

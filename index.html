@@ -106,7 +106,27 @@
 
     <div class="control-group color-control">
         <span class="toolbar-label">Color</span>
-        <input type="color" id="colorInput" value="#4751e1" aria-label="Couleur du trait" title="Couleur du trait" />
+        <div class="color-picker-wrap" id="colorPickerWrap">
+            <input type="color" id="colorInput" value="#4751e1" aria-label="Couleur du trait" title="Couleur du trait" aria-haspopup="dialog" aria-expanded="false" />
+            <div class="color-picker-popup" id="colorPickerPopup" role="dialog" aria-label="Choisir une couleur" hidden>
+                <div class="color-palette" id="colorPalette" aria-label="Couleurs prédéfinies">
+                    <button type="button" class="color-swatch" data-color="#e3342f" style="--swatch:#e3342f" aria-label="Rouge" title="Rouge"></button>
+                    <button type="button" class="color-swatch" data-color="#f6993f" style="--swatch:#f6993f" aria-label="Orange" title="Orange"></button>
+                    <button type="button" class="color-swatch" data-color="#ffed4a" style="--swatch:#ffed4a" aria-label="Jaune" title="Jaune"></button>
+                    <button type="button" class="color-swatch" data-color="#38c172" style="--swatch:#38c172" aria-label="Vert" title="Vert"></button>
+                    <button type="button" class="color-swatch" data-color="#4dc0b5" style="--swatch:#4dc0b5" aria-label="Turquoise" title="Turquoise"></button>
+                    <button type="button" class="color-swatch" data-color="#3490dc" style="--swatch:#3490dc" aria-label="Bleu" title="Bleu"></button>
+                    <button type="button" class="color-swatch" data-color="#6574cd" style="--swatch:#6574cd" aria-label="Indigo" title="Indigo"></button>
+                    <button type="button" class="color-swatch" data-color="#9561e2" style="--swatch:#9561e2" aria-label="Violet" title="Violet"></button>
+                    <button type="button" class="color-swatch" data-color="#f66d9b" style="--swatch:#f66d9b" aria-label="Rose" title="Rose"></button>
+                    <button type="button" class="color-swatch" data-color="#000000" style="--swatch:#000000" aria-label="Noir" title="Noir"></button>
+                    <button type="button" class="color-swatch" data-color="#808080" style="--swatch:#808080" aria-label="Gris" title="Gris"></button>
+                    <button type="button" class="color-swatch" data-color="#c0c0c0" style="--swatch:#c0c0c0" aria-label="Gris clair" title="Gris clair"></button>
+                </div>
+                <label class="custom-color-label" for="customColorInput">Couleur personnalisée</label>
+                <input type="color" id="customColorInput" value="#4751e1" aria-label="Couleur personnalisée" />
+            </div>
+        </div>        
         <button id="eyedropperButton" type="button" title="Prélever une couleur sur le canvas (Échap pour annuler)" aria-label="Pipette">
             <img src="pipette.png" alt="" width="20" height="20" style="object-fit:contain;display:block;pointer-events:none">
         </button>
@@ -123,8 +143,8 @@
 
     <label class="control-group transparency-control" title="Transparence du surlignage">
         <span class="toolbar-label">Transparency</span>
-        <input type="range" id="strokeOpacityInput" min="10" max="100" value="55" step="5" aria-label="Transparence" />
-        <output id="strokeOpacityValue" for="strokeOpacityInput">55%</output>
+        <input type="range" id="strokeOpacityInput" min="10" max="100" value="100" step="5" aria-label="Transparence" />
+        <output id="strokeOpacityValue" for="strokeOpacityInput">100%</output>
     </label>
 
     <div class="toolbar-divider"></div>
