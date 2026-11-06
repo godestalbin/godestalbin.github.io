@@ -13,10 +13,10 @@ const FUZE_I18N = {
     fr: {
         file: "Fichier", edit: "Édition", help: "Aide", helpFeatures: "Aide et fonctionnalités", openImage: "Ouvrir une image",
         copyAnnotated: "Copier l’image annotée", savePng: "Enregistrer en PNG",
-        clearPanel: "Effacer le canvas", select: "Sélection", text: "Texte",
+        clearPanel: "Effacer le canvas", select: "Sélection", text: "Texte", number: "Numéro",
         arrow: "Flèche", rectangle: "Rectangle", circle: "Cercle", felt: "Feutre",
         highlight: "Highlight", imageSize: "Taille image",
-        highlight: "Highlight", blur: "Brouillage", imageSize: "Taille image",
+        highlight: "Highlight", blur: "Brouillage", border: "Bordure", imageSize: "Taille image",
         color: "Couleur", thickness: "Épaisseur", transparency: "Transparence",
         textSize: "Taille du texte", zoom: "Zoom", toolbar: "Outils Fuze",
         imageSizeTitle: "Taille appliquée aux images chargées ou collées",
@@ -31,9 +31,9 @@ const FUZE_I18N = {
     en: {
         file: "File", edit: "Edit", help: "Help", helpFeatures: "Help & features", openImage: "Open image",
         copyAnnotated: "Copy annotated image", savePng: "Save as PNG",
-        clearPanel: "Clear canvas", select: "Select", text: "Text",
+        clearPanel: "Clear canvas", select: "Select", text: "Text", number: "Number",
         arrow: "Arrow", rectangle: "Rectangle", circle: "Circle", felt: "Felt",
-        highlight: "Highlight", imageSize: "Image size",
+        highlight: "Highlight", border: "Border", imageSize: "Image size",
         highlight: "Highlight", blur: "Blur", imageSize: "Image size",
         color: "Color", thickness: "Thickness", transparency: "Transparency",
         textSize: "Text size", zoom: "Zoom", toolbar: "Fuze tools",
@@ -66,11 +66,11 @@ function applyFuzeLanguage() {
         ['[data-action="copy-png"]', 'copyAnnotated'],
         ['[data-action="save-png"]', 'savePng'],
         ['[data-action="clear-panel"]', 'clearPanel'],
-        ['[data-tool="select"]', 'select'], ['[data-tool="text"]', 'text'],
+        ['[data-tool="select"]', 'select'], ['[data-tool="text"]', 'text'], ['[data-tool="number"]', 'number'],
         ['[data-tool="arrow"]', 'arrow'], ['[data-tool="rectangle"]', 'rectangle'],
         ['[data-tool="circle"]', 'circle'], ['[data-tool="felt"]', 'felt'],
         ['[data-tool="highlight"]', 'highlight'],
-        ['[data-tool="blur"]', 'blur']
+        ['[data-tool="blur"]', 'blur'], ['[data-tool="border"]', 'border']
     ];
     for (const [selector, key] of menuLabels) {
         const el = document.querySelector(selector);
