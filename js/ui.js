@@ -93,34 +93,12 @@ document.addEventListener("keydown", event => {
 function syncControlsFromSelectedObject() {
 
     const object = canvas.getActiveObject();
-    const selectedObjects = canvas.getActiveObjects();
     syncThicknessControl();
 
     if (!object) return;
 
 
-    // Synchronise la transparence affichée avec l'objet sélectionné.
-    // Pour une image avec bordure liée, la transparence correspond à la bordure.
-    let opacityObject = selectedObjects.length > 1 ? selectedObjects[0] : object;
-    if (opacityObject.type === "image" && opacityObject.fuzeBorderId) {
-        const linkedBorder = canvas.getObjects().find(
-            item => item.fuzeBorderOwnerId === opacityObject.fuzeBorderId
-        );
-        if (linkedBorder) opacityObject = linkedBorder;
-    }
-    const opacity = Number.isFinite(opacityObject.opacity) ? opacityObject.opacity : 1;
-    strokeOpacityInput.value = String(Math.max(10, Math.min(100, Math.round(opacity * 100))));
-    updateStrokeOpacityLabel();
-
-    if (object.fuzeTool === "number") {
-        const parts = object.getObjects();
-        const circle = parts.find(item => item.type === "circle");
-        const label = parts.find(item => item.type === "text");
-        if (circle && typeof circle.stroke === "string") colorInput.value = circle.stroke;
-        if (label && Number.isFinite(label.fontSize)) fontSizeInput.value = String(label.fontSize);
-        return;
-    }
-
+    const selectedObjects = canvas.getActiveObjects();
     if (selectedObjects.length > 1) {
         const newWidth = getStrokeWidth();
         const newColor = getColor();
@@ -131,15 +109,19 @@ function syncControlsFromSelectedObject() {
                 item.arrowColor = newColor;
                 if (thicknessWasEdited) item.arrowStrokeWidth = newWidth;
                 item.set({
-                    stroke: newColor,
+                    fill: newColor,
+                    stroke: "#ffffff",
+                    opacity: getStrokeOpacity(),
+                    shadow: createFuzeOutlineShadow(),
                     ...(thicknessWasEdited ? { strokeWidth: newWidth } : {})
                 });
                 changed = true;
             } else if (["rect", "ellipse", "path"].includes(item.type)) {
                 item.set({
-                    stroke: item.fuzeTool === "highlight" ? "rgba(255,210,30,0.85)" : newColor,
+                    stroke: item.fuzeTool === "highlight" ? "#FFD21E" : newColor,
                     ...(thicknessWasEdited ? { strokeWidth: newWidth } : {}),
-                    opacity: getStrokeOpacity()
+                    opacity: getStrokeOpacity(),
+                    shadow: createFuzeOutlineShadow()
                 });
                 changed = true;
             }
@@ -151,6 +133,16 @@ function syncControlsFromSelectedObject() {
             updateStatus("Épaisseur appliquée aux objets sélectionnés");
         }
         return;
+    }
+
+    // Synchronise aussi le curseur de transparence avec l'objet sélectionné.
+    if (
+        (isFancyArrow(object) || object.type === "i-text" ||
+         object.type === "rect" || object.type === "ellipse") &&
+        Number.isFinite(object.opacity)
+    ) {
+        strokeOpacityInput.value = String(Math.round(object.opacity * 100));
+        updateStrokeOpacityLabel();
     }
 
     /* -------------------------------------------------
@@ -182,23 +174,6 @@ function syncControlsFromSelectedObject() {
         return;
     }
 
-
-    /* -------------------------------------------------
-       IMAGE AVEC BORDURE ASSOCIÉE
-    ------------------------------------------------- */
-
-    if (object.type === "image" && object.fuzeBorderId) {
-        const border = canvas.getObjects().find(item => item.fuzeBorderOwnerId === object.fuzeBorderId);
-        if (border) {
-            if (typeof border.stroke === "string" && /^#[0-9a-f]{3,8}$/i.test(border.stroke)) {
-                colorInput.value = border.stroke;
-            }
-            if (Number.isFinite(Number(border.strokeWidth))) {
-                strokeWidthInput.value = String(border.strokeWidth);
-            }
-        }
-        return;
-    }
 
     /* -------------------------------------------------
        TEXTE
@@ -236,18 +211,6 @@ function syncControlsFromSelectedObject() {
 
 
     /* -------------------------------------------------
-       IMAGE AVEC BORDURE ASSOCIÉE
-    ------------------------------------------------- */
-
-    if (object.type === "image") {
-        updateImageBorderStyle(object, getColor(), getStrokeWidth());
-        canvas.requestRenderAll();
-        saveHistory();
-        updateStatus("Bordure de l’image modifiée");
-        return;
-    }
-
-    /* -------------------------------------------------
        RECTANGLE / CERCLE
     ------------------------------------------------- */
 
@@ -282,7 +245,7 @@ function syncControlsFromSelectedObject() {
    MODIFICATION COULEUR / ÉPAISSEUR
 ===================================================== */
 
-function updateSelectedObject(source = null) {
+function updateSelectedObject() {
 
     const object =
         canvas.getActiveObject();
@@ -296,16 +259,6 @@ function updateSelectedObject(source = null) {
         return;
     }
 
-
-    /* -------------------------------------------------
-       NUMÉRO ENTOURÉ
-    ------------------------------------------------- */
-
-    if (object.fuzeTool === "number") {
-        updateFuzeNumberStyle(object, source);
-        syncControlsFromSelectedObject();
-        return;
-    }
 
     /* -------------------------------------------------
        FLÈCHE
@@ -336,7 +289,8 @@ function updateSelectedObject(source = null) {
                 object.y2,
 
                 newColor,
-                newStrokeWidth
+                newStrokeWidth,
+                getStrokeOpacity()
             );
 
 
@@ -431,7 +385,8 @@ function updateSelectedObject(source = null) {
 
         object.set({
             fill: getColor(),
-             opacity: getStrokeOpacity()
+            opacity: getStrokeOpacity(),
+            shadow: createFuzeOutlineShadow()
         });
 
 
@@ -471,18 +426,6 @@ function updateSelectedObject(source = null) {
 
 
     /* -------------------------------------------------
-       IMAGE AVEC BORDURE ASSOCIÉE
-    ------------------------------------------------- */
-
-    if (object.type === "image") {
-        updateImageBorderStyle(object, getColor(), getStrokeWidth());
-        canvas.requestRenderAll();
-        saveHistory();
-        updateStatus("Bordure de l’image modifiée");
-        return;
-    }
-
-    /* -------------------------------------------------
        RECTANGLE / CERCLE
     ------------------------------------------------- */
 
@@ -499,7 +442,8 @@ function updateSelectedObject(source = null) {
 
             strokeWidth: getStrokeWidth(),
 
-            opacity: getStrokeOpacity()
+            opacity: getStrokeOpacity(),
+            shadow: createFuzeOutlineShadow()
         });
 
 
@@ -537,66 +481,6 @@ function updateSelectedObject(source = null) {
    CONTRÔLES DE STYLE
 ===================================================== */
 
-const colorPickerWrap = document.getElementById("colorPickerWrap");
-const colorPickerPopup = document.getElementById("colorPickerPopup");
-const customColorInput = document.getElementById("customColorInput");
-
-function setColorPickerOpen(open) {
-    colorPickerPopup.hidden = !open;
-    colorInput.setAttribute("aria-expanded", String(open));
-    if (open) {
-        customColorInput.value = colorInput.value;
-        colorPickerPopup.querySelectorAll(".color-swatch").forEach(swatch => {
-            swatch.setAttribute("aria-pressed", String(swatch.dataset.color.toLowerCase() === colorInput.value.toLowerCase()));
-        });
-    }
-}
-
-// Keep the existing color control, but open our palette instead of the browser popup.
-colorInput.addEventListener("click", event => {
-    event.preventDefault();
-    setColorPickerOpen(colorPickerPopup.hidden);
-});
-colorInput.addEventListener("keydown", event => {
-    if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        setColorPickerOpen(colorPickerPopup.hidden);
-    }
-    if (event.key === "Escape") setColorPickerOpen(false);
-});
-
-colorPickerPopup.querySelectorAll(".color-swatch").forEach(swatch => {
-    swatch.addEventListener("click", () => {
-        colorInput.value = swatch.dataset.color;
-        customColorInput.value = swatch.dataset.color;
-        colorPickerPopup.querySelectorAll(".color-swatch").forEach(item => item.setAttribute("aria-pressed", String(item === swatch)));
-        colorInput.dispatchEvent(new Event("input", { bubbles: true }));
-        colorInput.dispatchEvent(new Event("change", { bubbles: true }));
-        setColorPickerOpen(false);
-        colorInput.focus();
-    });
-});
-
-customColorInput.addEventListener("input", () => {
-    colorInput.value = customColorInput.value;
-    colorPickerPopup.querySelectorAll(".color-swatch").forEach(swatch => {
-        swatch.setAttribute("aria-pressed", String(swatch.dataset.color.toLowerCase() === colorInput.value.toLowerCase()));
-    });
-    colorInput.dispatchEvent(new Event("input", { bubbles: true }));
-});
-customColorInput.addEventListener("change", () => {
-    colorInput.value = customColorInput.value;
-    colorInput.dispatchEvent(new Event("change", { bubbles: true }));
-    setColorPickerOpen(false);
-});
-
-document.addEventListener("pointerdown", event => {
-    if (!colorPickerWrap.contains(event.target)) setColorPickerOpen(false);
-});
-document.addEventListener("keydown", event => {
-    if (event.key === "Escape" && !colorPickerPopup.hidden) setColorPickerOpen(false);
-});
-
 colorInput.addEventListener(
     "input",
     updateSelectedObject
@@ -604,7 +488,7 @@ colorInput.addEventListener(
 
 strokeWidthInput.addEventListener(
     "change",
-    () => updateSelectedObject("strokeWidth")
+    updateSelectedObject
 );
 
 strokeOpacityInput.addEventListener("input", () => {
@@ -617,7 +501,7 @@ syncThicknessControl();
 
 fontSizeInput.addEventListener(
     "change",
-    () => updateSelectedObject("fontSize")
+    updateSelectedObject
 );
 
 /* =====================================================
@@ -652,10 +536,3 @@ workspace.addEventListener(
 );
 
 
-
-
-// Border is an action on the currently selected image, not a drawing mode.
-document.querySelector('[data-action="add-border"]')?.addEventListener("click", () => {
-    addBorderToSelectedImage();
-    document.querySelectorAll(".toolbar-menu").forEach(menu => menu.removeAttribute("open"));
-});
