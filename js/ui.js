@@ -111,6 +111,16 @@ function syncControlsFromSelectedObject() {
     const opacity = Number.isFinite(opacityObject.opacity) ? opacityObject.opacity : 1;
     strokeOpacityInput.value = String(Math.max(10, Math.min(100, Math.round(opacity * 100))));
     updateStrokeOpacityLabel();
+
+    if (object.fuzeTool === "number") {
+        const parts = object.getObjects();
+        const circle = parts.find(item => item.type === "circle");
+        const label = parts.find(item => item.type === "text");
+        if (circle && typeof circle.stroke === "string") colorInput.value = circle.stroke;
+        if (label && Number.isFinite(label.fontSize)) fontSizeInput.value = String(label.fontSize);
+        return;
+    }
+
     if (selectedObjects.length > 1) {
         const newWidth = getStrokeWidth();
         const newColor = getColor();
@@ -272,7 +282,7 @@ function syncControlsFromSelectedObject() {
    MODIFICATION COULEUR / ÉPAISSEUR
 ===================================================== */
 
-function updateSelectedObject() {
+function updateSelectedObject(source = null) {
 
     const object =
         canvas.getActiveObject();
@@ -286,6 +296,16 @@ function updateSelectedObject() {
         return;
     }
 
+
+    /* -------------------------------------------------
+       NUMÉRO ENTOURÉ
+    ------------------------------------------------- */
+
+    if (object.fuzeTool === "number") {
+        updateFuzeNumberStyle(object, source);
+        syncControlsFromSelectedObject();
+        return;
+    }
 
     /* -------------------------------------------------
        FLÈCHE
@@ -584,7 +604,7 @@ colorInput.addEventListener(
 
 strokeWidthInput.addEventListener(
     "change",
-    updateSelectedObject
+    () => updateSelectedObject("strokeWidth")
 );
 
 strokeOpacityInput.addEventListener("input", () => {
@@ -597,7 +617,7 @@ syncThicknessControl();
 
 fontSizeInput.addEventListener(
     "change",
-    updateSelectedObject
+    () => updateSelectedObject("fontSize")
 );
 
 /* =====================================================

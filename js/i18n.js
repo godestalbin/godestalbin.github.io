@@ -13,7 +13,7 @@ const FUZE_I18N = {
     fr: {
         file: "Fichier", edit: "Édition", help: "Aide", helpFeatures: "Aide et fonctionnalités", openImage: "Ouvrir une image",
         copyAnnotated: "Copier l’image annotée", savePng: "Enregistrer en PNG",
-        clearPanel: "Effacer le canvas", select: "Sélection", text: "Texte",
+        clearPanel: "Effacer le canvas", select: "Sélection", text: "Texte", number: "Numéro",
         arrow: "Flèche", rectangle: "Rectangle", circle: "Cercle", felt: "Feutre",
         highlight: "Highlight", imageSize: "Taille image",
         highlight: "Highlight", blur: "Brouillage", imageSize: "Taille image",
@@ -31,7 +31,7 @@ const FUZE_I18N = {
     en: {
         file: "File", edit: "Edit", help: "Help", helpFeatures: "Help & features", openImage: "Open image",
         copyAnnotated: "Copy annotated image", savePng: "Save as PNG",
-        clearPanel: "Clear canvas", select: "Select", text: "Text",
+        clearPanel: "Clear canvas", select: "Select", text: "Text", number: "Number",
         arrow: "Arrow", rectangle: "Rectangle", circle: "Circle", felt: "Felt",
         highlight: "Highlight", imageSize: "Image size",
         highlight: "Highlight", blur: "Blur", imageSize: "Image size",

@@ -17,6 +17,7 @@ const SERIALIZED_PROPERTIES = [
     "arrowColor",
     "arrowStrokeWidth",
     "fuzeTool",
+    "fuzeNumber",
     "blurType",
     "blurRadius",
     "fuzeBorderId",

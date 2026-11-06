@@ -389,6 +389,7 @@ document.addEventListener("keydown", event => {
         const toolByKey = {
             s: "select",
             t: "text",
+            n: "number",
             a: "arrow",
             r: "rectangle",
             c: "circle",

@@ -314,6 +314,7 @@
             updateStatus(
                 tool === "felt" ? "Feutre : tracer librement" :
                 tool === "highlight" ? "Highlight : tracer un rectangle jaune" :
+                tool === "number" ? (FUZE_LANGUAGE === "en" ? "Number: click to add a circled number" : "Numéro : cliquez pour ajouter un numéro entouré") :
                 "Outil : " + tool
             );
         }
@@ -1841,7 +1842,8 @@
 
         if (
             currentTool === "select" ||
-            currentTool === "text"
+            currentTool === "text" ||
+            currentTool === "number"
         ) {
             return;
         }
@@ -2560,6 +2562,11 @@
                 return;
             }
 
+            if (currentTool === "number") {
+                addNumberAt(event.e);
+                return;
+            }
+
             if (
                 currentTool ===
                 "text"
@@ -2608,6 +2615,141 @@
             updateEyedropperCursor();
         }
     });
+
+    /* =====================================================
+    NUMÉROS ENTOURÉS
+    ===================================================== */
+
+    function getNumberTextOffset(thickness) {
+        return {
+            x: thickness * 0.5,
+            y: -thickness * 0.5
+        };
+    }    
+
+    function getNextFuzeNumber() {
+        const used = new Set(
+            canvas.getObjects()
+                .filter(object => object.fuzeTool === "number" && Number.isInteger(object.fuzeNumber))
+                .map(object => object.fuzeNumber)
+        );
+
+        let number = 1;
+        while (used.has(number)) number++;
+        return number;
+    }
+
+    function createFuzeNumberObject(number, x, y, fontSize, color, opacity, strokeWidth = getStrokeWidth()) {
+        // Un léger décalage optique compense les marges internes de la police Arial.
+        const offsets = getNumberTextOffset(strokeWidth, fontSize);
+        const label = new fabric.Text(String(number), {
+            left: offsets.x,
+            top: -offsets.y,
+            originX: "center",
+            originY: "center",
+            fontFamily: "Arial",
+            fontSize,
+            fontWeight: "bold",
+            fill: color,
+            textAlign: "center",
+            objectCaching: false
+        });
+        // Cercle plus compact, avec une marge suffisante pour le texte et son contour.
+        const radius = Math.max(10, (label.width / 2) + (strokeWidth / 2) + 3, (label.height / 2) + (strokeWidth / 2) + 3);
+        const circle = new fabric.Circle({
+            left: -radius,
+            top: -radius,
+            radius,
+            originX: "left",
+            originY: "top",
+            fill: "rgba(255,255,255,0)",
+            stroke: color,
+            strokeWidth,
+            objectCaching: false
+        });
+
+        const group = new fabric.Group([circle, label], {
+            left: x,
+            top: y,
+            originX: "center",
+            originY: "center",
+            opacity,
+            selectable: false,
+            evented: false,
+            objectCaching: false,
+            subTargetCheck: false
+        });
+        group.fuzeTool = "number";
+        group.fuzeNumber = number;
+        return group;
+    }
+
+    function addNumberAt(event) {
+        const pointer = canvas.getScenePoint(event);
+        const number = getNextFuzeNumber();
+        const object = createFuzeNumberObject(
+            number,
+            pointer.x,
+            pointer.y,
+            getFontSize(),
+            getColor(),
+            getStrokeOpacity(),
+            getStrokeWidth()
+        );
+
+        canvas.add(object);
+        canvas.requestRenderAll();
+        trackEvent("element_created", { element_type: "number" });
+        saveHistory();
+        updateEmptyMessage();
+        updateStatus(FUZE_LANGUAGE === "en" ? `Number added: ${number}` : `Numéro ajouté : ${number}`);
+    }
+
+    function updateFuzeNumberStyle(object, source = null) {
+        if (!object || object.fuzeTool !== "number") return;
+
+        const color = getColor();
+        const opacity = getStrokeOpacity();
+        const objects = object.getObjects();
+        const circle = objects.find(item => item.type === "circle");
+        const label = objects.find(item => item.type === "text");
+        if (!circle || !label) return;
+
+        circle.set({
+            stroke: color,
+            strokeWidth: getStrokeWidth()
+        });
+        label.set({ fill: color });
+        object.set({ opacity });
+
+        if (source === "fontSize") {
+            const replacement = createFuzeNumberObject(
+                object.fuzeNumber,
+                object.left,
+                object.top,
+                getFontSize(),
+                color,
+                opacity
+            );
+            replacement.set({
+                angle: object.angle,
+                scaleX: object.scaleX,
+                scaleY: object.scaleY,
+                selectable: true,
+                evented: true
+            });
+            const index = canvas.getObjects().indexOf(object);
+            if (index !== -1) {
+                canvas.remove(object);
+                canvas.insertAt(index, replacement);
+                canvas.setActiveObject(replacement);
+            }
+        }
+        object.setCoords();
+        canvas.requestRenderAll();
+        saveHistory();
+        updateStatus(FUZE_LANGUAGE === "en" ? "Number updated" : "Numéro modifié");
+    }
 
     /* =====================================================
     TEXTE
