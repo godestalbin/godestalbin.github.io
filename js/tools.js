@@ -3228,7 +3228,7 @@
 
 
                 canvas.backgroundColor =
-                    "white";
+                    "grey";
 
 
                 canvas.renderAll();
