@@ -33,6 +33,7 @@ let historyIndex = -1;
 let restoringHistory = false;
 
 let draggingArrowHandle = null;
+let arrowHandleDragOffset = null;
 let editingArrow = null;
 let editingText = null;
 let editingTextChanged = false;

@@ -18,8 +18,7 @@
 
     function getStrokeObjects() {
         return canvas.getActiveObjects().filter(object =>
-            isFancyArrow(object) ||
-            isSimpleArrow(object) ||
+            isEditableArrow(object) ||
             object.type === "rect" ||
             object.type === "ellipse" ||
             object.type === "path"
@@ -27,7 +26,7 @@
     }
 
     function getObjectThickness(object) {
-        if (isFancyArrow(object) || isSimpleArrow(object)) return Number(object.arrowStrokeWidth ?? object.strokeWidth);
+        if (isEditableArrow(object)) return Number(object.arrowStrokeWidth ?? object.strokeWidth);
         return Number(object.strokeWidth);
     }
 
@@ -402,6 +401,10 @@
         return !!(object && object.arrowType === "simple");
     }
 
+    function isEditableArrow(object) {
+        return isFancyArrow(object) || isSimpleArrow(object);
+    }
+
 
     /* -----------------------------------------------------
     DIMENSIONS DE LA FLÈCHE
@@ -417,23 +420,13 @@
         blanc est centré sur son bord.
         */
 
-        const innerTail =
-            Math.max(
-                12,
-                strokeWidth * 2.2
-            );
+        // Les dimensions suivent réellement la valeur choisie.
+        // À partir de 6, les proportions restent identiques à l'ancien rendu.
+        const innerTail = strokeWidth * 2.2;
 
-        const innerShaft =
-            Math.max(
-                24,
-                strokeWidth * 4.0
-            );
+        const innerShaft = strokeWidth * 4.0;
 
-        const innerHead =
-            Math.max(
-                52,
-                innerShaft * 2.35
-            );
+        const innerHead = innerShaft * 2.35;
 
 
         /*
@@ -442,11 +435,7 @@
         Il reste volontairement raisonnable
         afin de ne pas manger la couleur.
         */
-        const outlineWidth =
-            Math.max(
-                5,
-                strokeWidth * 0.90
-            );
+        const outlineWidth = strokeWidth * 0.90;
 
 
         return {
@@ -525,7 +514,7 @@
             Math.min(
                 length * 0.45,
                 Math.max(
-                    35,
+                    8,
                     headWidth * 0.85
                 )
             );
@@ -1024,21 +1013,15 @@
         Coins légèrement arrondis.
         */
         const radius =
-            Math.max(
-                12,
-                Math.min(
-                    strokeWidth * 2.2,
-                    28
-                )
+            Math.min(
+                strokeWidth * 2.2,
+                28
             );
 
         const tipRadius =
-            Math.max(
-                26,
-                Math.min(
-                    strokeWidth * 3.8,
-                    50
-                )
+            Math.min(
+                strokeWidth * 3.8,
+                50
             );
 
 
@@ -1220,7 +1203,7 @@
     Les trois couches sont superposées exactement : gris,
     blanc, puis couleur. Le groupe reste un objet unique.
     ===================================================== */
-    function createSimpleArrow(x1, y1, x2, y2, color, strokeWidth, opacity = 1) {
+    function getSimpleArrowGeometry(x1, y1, x2, y2, strokeWidth) {
         const dx = x2 - x1;
         const dy = y2 - y1;
         const length = Math.hypot(dx, dy);
@@ -1247,17 +1230,40 @@
         const outlineWidth = Math.max(2, strokeWidth * 0.4);
         const shadedContour = Math.max(5.5, strokeWidth * 0.88);
         const padding = outlineWidth + shadedContour * 3 + 3;
-        const minX = Math.min(...points.map(p => p.x)) - padding;
-        const minY = Math.min(...points.map(p => p.y)) - padding;
-        const pathData = `M ${points.map(p => `${p.x - minX} ${p.y - minY}`).join(" L ")} Z`;
+        const minX = Math.min(...points.map(point => point.x)) - padding;
+        const minY = Math.min(...points.map(point => point.y)) - padding;
+        const pathData = `M ${points.map(point => `${point.x - minX} ${point.y - minY}`).join(" L ")} Z`;
+
+        return {
+            pathData,
+            minX,
+            minY,
+            outlineWidth,
+            shadedContour,
+            localStart: { x: x1 - minX, y: y1 - minY },
+            localEnd: { x: x2 - minX, y: y2 - minY }
+        };
+    }
+
+    function createSimpleArrow(x1, y1, x2, y2, color, strokeWidth, opacity = 1) {
+        const geometry = getSimpleArrowGeometry(x1, y1, x2, y2, strokeWidth);
+        if (!geometry) return null;
+
+        const {
+            pathData, minX, minY, outlineWidth, shadedContour,
+            localStart, localEnd
+        } = geometry;
 
         return new fabric.Path(pathData, {
-            left: minX, top: minY, originX: "left", originY: "top",
+            left: minX,
+            top: minY,
+            originX: "left",
+            originY: "top",
             fill: color,
             stroke: "#ffffff",
             strokeWidth: outlineWidth,
-            strokeLineJoin: "round", strokeLineCap: "round",
-            // Contour gris diffus et uniforme, sans décalage directionnel.
+            strokeLineJoin: "round",
+            strokeLineCap: "round",
             shadow: new fabric.Shadow({
                 color: "rgba(35, 35, 35, 0.88)",
                 blur: shadedContour,
@@ -1265,12 +1271,21 @@
                 offsetY: 0
             }),
             opacity,
-            selectable: true, evented: true,
-            hasControls: false, hasBorders: true,
-            lockScalingX: true, lockScalingY: true, lockRotation: true,
+            selectable: true,
+            evented: true,
+            hasControls: false,
+            hasBorders: true,
+            lockScalingX: true,
+            lockScalingY: true,
+            lockRotation: true,
             objectCaching: false,
-            arrowType: "simple", x1, y1, x2, y2,
-            arrowColor: color, arrowStrokeWidth: strokeWidth
+            arrowType: "simple",
+            x1, y1, x2, y2,
+            // Points d'ancrage exprimés dans le système local réel du Path.
+            arrowPointStart: localStart,
+            arrowPointEnd: localEnd,
+            arrowColor: color,
+            arrowStrokeWidth: strokeWidth
         });
     }
 
@@ -1278,27 +1293,23 @@
     RECONSTRUCTION
     ===================================================== */
 
-    function rebuildArrow(
-        oldArrow,
-        x1,
-        y1,
-        x2,
-        y2
-    ) {
-
+    function rebuildArrow(oldArrow, x1, y1, x2, y2) {
         const color = oldArrow.arrowColor || getColor();
-        const width = oldArrow.arrowStrokeWidth || getStrokeWidth();
+        const strokeWidth = oldArrow.arrowStrokeWidth || getStrokeWidth();
 
         if (isSimpleArrow(oldArrow)) {
             return createSimpleArrow(
                 x1, y1, x2, y2,
-                color, width,
-                Number.isFinite(oldArrow.opacity) ? oldArrow.opacity : 1
+                color,
+                strokeWidth,
+                oldArrow.opacity ?? 1
             );
         }
 
         return createFancyArrow(
-            x1, y1, x2, y2, color, width
+            x1, y1, x2, y2,
+            color,
+            strokeWidth
         );
     }
 
@@ -1311,10 +1322,7 @@
         object
     ) {
 
-        if (
-            !isFancyArrow(object) && !isSimpleArrow(object)
-        ) {
-            editingArrow = null;
+        if (!isEditableArrow(object)) {
             hideArrowHandles();
             return;
         }
@@ -1355,231 +1363,56 @@
     POSITIONNEMENT DES POIGNÉES
     ----------------------------------------------------- */
 
-    function positionArrowHandles(
-        object
-    ) {
-
-        if (
-            !isFancyArrow(object) && !isSimpleArrow(object)
-        ) {
+    function positionArrowHandles(object) {
+        if (!isEditableArrow(object)) {
             hideArrowHandles();
             return;
         }
 
-        // Pour une flèche simple, les extrémités sont directement
-        // exprimées dans le repère du canvas. On les convertit via
-        // la matrice Fabric de l'objet (déplacement/zoom compris).
-        if (isSimpleArrow(object)) {
+        /*
+         * x1/y1 et x2/y2 sont les coordonnées de la scène Fabric,
+         * pas des coordonnées locales du Path. On les transforme
+         * directement avec le viewportTransform.
+         *
+         * Ne pas repasser par pathOffset / calcTransformMatrix :
+         * le Path contient des marges liées au contour et à l'ombre,
+         * qui varient avec l'épaisseur et ne doivent pas déplacer
+         * les points d'ancrage des poignées.
+         */
+        let startScene;
+        let endScene;
+
+        if (isSimpleArrow(object) || isFancyArrow(object)) {
             const pathOffset = object.pathOffset || new fabric.Point(0, 0);
+            const objectMatrix = object.calcTransformMatrix();
             const startLocal = new fabric.Point(
-                object.x1 - object.left - pathOffset.x,
-                object.y1 - object.top - pathOffset.y
+                object.arrowPointStart.x - pathOffset.x,
+                object.arrowPointStart.y - pathOffset.y
             );
             const endLocal = new fabric.Point(
-                object.x2 - object.left - pathOffset.x,
-                object.y2 - object.top - pathOffset.y
+                object.arrowPointEnd.x - pathOffset.x,
+                object.arrowPointEnd.y - pathOffset.y
             );
-            const matrix = object.calcTransformMatrix();
-            const viewport = canvas.viewportTransform;
-            const startScreen = fabric.util.transformPoint(
-                fabric.util.transformPoint(startLocal, matrix), viewport
-            );
-            const endScreen = fabric.util.transformPoint(
-                fabric.util.transformPoint(endLocal, matrix), viewport
-            );
-            const canvasRect = canvas.upperCanvasEl.getBoundingClientRect();
-            const stageRect = stage.getBoundingClientRect();
-            const offsetX = canvasRect.left - stageRect.left;
-            const offsetY = canvasRect.top - stageRect.top;
-            arrowHandleStart.style.left = `${offsetX + startScreen.x}px`;
-            arrowHandleStart.style.top = `${offsetY + startScreen.y}px`;
-            arrowHandleEnd.style.left = `${offsetX + endScreen.x}px`;
-            arrowHandleEnd.style.top = `${offsetY + endScreen.y}px`;
-            return;
+            startScene = fabric.util.transformPoint(startLocal, objectMatrix);
+            endScene = fabric.util.transformPoint(endLocal, objectMatrix);
+        } else {
+            // Smart Arrow : conserver exactement le référentiel existant.
+            startScene = new fabric.Point(object.x1, object.y1);
+            endScene = new fabric.Point(object.x2, object.y2);
         }
 
-        /*
-        -------------------------------------------------
-        Les coordonnées x1/y1 et x2/y2 sont globales.
+        const startScreen = fabric.util.transformPoint(startScene, canvas.viewportTransform);
+        const endScreen = fabric.util.transformPoint(endScene, canvas.viewportTransform);
 
-        Le Path, lui, travaille avec ses propres
-        coordonnées locales.
+        const canvasRect = canvas.upperCanvasEl.getBoundingClientRect();
+        const stageRect = stage.getBoundingClientRect();
+        const offsetX = canvasRect.left - stageRect.left;
+        const offsetY = canvasRect.top - stageRect.top;
 
-        On reconstruit donc les coordonnées locales
-        des deux extrémités.
-        -------------------------------------------------
-        */
-
-        const geometry =
-            createArrowPathData(
-                object.x1,
-                object.y1,
-                object.x2,
-                object.y2,
-                object.arrowStrokeWidth
-            );
-
-
-        if (!geometry) {
-            return;
-        }
-
-
-        const {
-            bounds
-        } = geometry;
-
-
-        /*
-        Coordonnées de x1/y1 et x2/y2 dans le
-        système utilisé par pathData.
-        */
-
-        const localStart =
-            new fabric.Point(
-
-                object.x1 -
-                bounds.minX,
-
-                object.y1 -
-                bounds.minY
-            );
-
-
-        const localEnd =
-            new fabric.Point(
-
-                object.x2 -
-                bounds.minX,
-
-                object.y2 -
-                bounds.minY
-            );
-
-
-        /*
-        -------------------------------------------------
-        IMPORTANT
-        -------------------------------------------------
-
-        Fabric Path utilise pathOffset pour positionner
-        son système de coordonnées local.
-
-        On convertit donc le point du path en point
-        relatif à l'origine Fabric du Path.
-        */
-
-        const pathOffset =
-            object.pathOffset ||
-            new fabric.Point(
-                0,
-                0
-            );
-
-
-        const startForFabric =
-            new fabric.Point(
-
-                localStart.x -
-                pathOffset.x,
-
-                localStart.y -
-                pathOffset.y
-            );
-
-
-        const endForFabric =
-            new fabric.Point(
-
-                localEnd.x -
-                pathOffset.x,
-
-                localEnd.y -
-                pathOffset.y
-            );
-
-
-        /*
-        -------------------------------------------------
-        TRANSFORMATION PAR LE PATH
-        -------------------------------------------------
-        */
-
-        const startCanvas =
-            fabric.util.transformPoint(
-                startForFabric,
-                object.calcTransformMatrix()
-            );
-
-
-        const endCanvas =
-            fabric.util.transformPoint(
-                endForFabric,
-                object.calcTransformMatrix()
-            );
-
-
-        /*
-        -------------------------------------------------
-        TRANSFORMATION DU CANVAS VERS L'ÉCRAN
-        -------------------------------------------------
-        */
-
-        const startScreen =
-            fabric.util.transformPoint(
-                startCanvas,
-                canvas.viewportTransform
-            );
-
-
-        const endScreen =
-            fabric.util.transformPoint(
-                endCanvas,
-                canvas.viewportTransform
-            );
-
-
-        /*
-        -------------------------------------------------
-        POSITION DU CANVAS DANS LE STAGE
-        -------------------------------------------------
-        */
-
-        const canvasRect =
-            canvas.upperCanvasEl
-                .getBoundingClientRect();
-
-        const stageRect =
-            stage.getBoundingClientRect();
-
-
-        const offsetX =
-            canvasRect.left -
-            stageRect.left;
-
-        const offsetY =
-            canvasRect.top -
-            stageRect.top;
-
-
-        /*
-        -------------------------------------------------
-        POSITION DES POIGNÉES
-        -------------------------------------------------
-        */
-
-        arrowHandleStart.style.left =
-            `${offsetX + startScreen.x}px`;
-
-        arrowHandleStart.style.top =
-            `${offsetY + startScreen.y}px`;
-
-
-        arrowHandleEnd.style.left =
-            `${offsetX + endScreen.x}px`;
-
-        arrowHandleEnd.style.top =
-            `${offsetY + endScreen.y}px`;
+        arrowHandleStart.style.left = `${offsetX + startScreen.x}px`;
+        arrowHandleStart.style.top = `${offsetY + startScreen.y}px`;
+        arrowHandleEnd.style.left = `${offsetX + endScreen.x}px`;
+        arrowHandleEnd.style.top = `${offsetY + endScreen.y}px`;
     }
 
     /* =====================================================
@@ -1602,6 +1435,16 @@
 
         draggingArrowHandle =
             which;
+
+        // Mémorise le décalage de prise pour éviter tout saut au premier mouvement.
+        if (isSimpleArrow(editingArrow) || isFancyArrow(editingArrow)) {
+            const pointer = canvas.getScenePoint(event);
+            const anchorX = which === "start" ? editingArrow.x1 : editingArrow.x2;
+            const anchorY = which === "start" ? editingArrow.y1 : editingArrow.y2;
+            arrowHandleDragOffset = { x: anchorX - pointer.x, y: anchorY - pointer.y };
+        } else {
+            arrowHandleDragOffset = { x: 0, y: 0 };
+        }
 
 
         document.body.style.userSelect =
@@ -1631,45 +1474,8 @@
         }
 
 
-        /*
-        Coordonnées écran du canvas.
-        */
-        const canvasRect =
-            canvas.upperCanvasEl
-                .getBoundingClientRect();
-
-
-        const screenX =
-            event.clientX -
-            canvasRect.left;
-
-        const screenY =
-            event.clientY -
-            canvasRect.top;
-
-
-        /*
-        Transformation inverse.
-
-        Cela permet de retrouver les coordonnées
-        logiques même avec un zoom.
-        */
-        const inverse =
-            fabric.util.invertTransform(
-                canvas.viewportTransform
-            );
-
-
-        const point =
-            fabric.util.transformPoint(
-
-                new fabric.Point(
-                    screenX,
-                    screenY
-                ),
-
-                inverse
-            );
+        // Fabric gère lui-même les coordonnées écran, le zoom et le viewport.
+        const point = canvas.getScenePoint(event);
 
 
         let x1 =
@@ -1692,14 +1498,14 @@
 
             x1 =
                 clamp(
-                    point.x,
+                    (point.x + (arrowHandleDragOffset?.x || 0)),
                     -100,
                     CANVAS_WIDTH + 100
                 );
 
             y1 =
                 clamp(
-                    point.y,
+                    (point.y + (arrowHandleDragOffset?.y || 0)),
                     -100,
                     CANVAS_HEIGHT + 100
                 );
@@ -1708,14 +1514,14 @@
 
             x2 =
                 clamp(
-                    point.x,
+                    (point.x + (arrowHandleDragOffset?.x || 0)),
                     -100,
                     CANVAS_WIDTH + 100
                 );
 
             y2 =
                 clamp(
-                    point.y,
+                    (point.y + (arrowHandleDragOffset?.y || 0)),
                     -100,
                     CANVAS_HEIGHT + 100
                 );
@@ -1818,6 +1624,7 @@
 
 
         draggingArrowHandle = null;
+        arrowHandleDragOffset = null;
 
         document.body.style.userSelect =
             "";
@@ -1864,7 +1671,9 @@
 
             if (
                 editingArrow &&
-                (isFancyArrow(editingArrow) || isSimpleArrow(editingArrow))
+                isEditableArrow(
+                    editingArrow
+                )
             ) {
 
                 startArrowHandleDrag(
@@ -1891,7 +1700,9 @@
 
             if (
                 editingArrow &&
-                (isFancyArrow(editingArrow) || isSimpleArrow(editingArrow))
+                isEditableArrow(
+                    editingArrow
+                )
             ) {
 
                 startArrowHandleDrag(
@@ -3052,7 +2863,7 @@
 
             if (
                 object &&
-                (isFancyArrow(object) || isSimpleArrow(object))
+                isEditableArrow(object)
             ) {
 
                 editingArrow =
@@ -3085,7 +2896,7 @@
 
             if (
                 object &&
-                (isFancyArrow(object) || isSimpleArrow(object))
+                isEditableArrow(object)
             ) {
 
                 editingArrow =
@@ -3131,7 +2942,7 @@
 
 
             if (
-                !isFancyArrow(object) && !isSimpleArrow(object)
+                !isEditableArrow(object)
             ) {
                 return;
             }
@@ -3193,7 +3004,7 @@
 
 
             if (
-                isFancyArrow(object) || isSimpleArrow(object)
+                isEditableArrow(object)
             ) {
 
                 delete object.__previousLeft;

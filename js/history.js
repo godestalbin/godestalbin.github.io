@@ -91,7 +91,7 @@ function restoreHistoryState(
 
             if (
                 active &&
-                (isFancyArrow(active) || isSimpleArrow(active))
+                isFancyArrow(active)
             ) {
 
                 editingArrow =
