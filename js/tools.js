@@ -19,6 +19,7 @@
     function getStrokeObjects() {
         return canvas.getActiveObjects().filter(object =>
             isFancyArrow(object) ||
+            isSimpleArrow(object) ||
             object.type === "rect" ||
             object.type === "ellipse" ||
             object.type === "path"
@@ -26,7 +27,7 @@
     }
 
     function getObjectThickness(object) {
-        if (isFancyArrow(object)) return Number(object.arrowStrokeWidth ?? object.strokeWidth);
+        if (isFancyArrow(object) || isSimpleArrow(object)) return Number(object.arrowStrokeWidth ?? object.strokeWidth);
         return Number(object.strokeWidth);
     }
 
@@ -365,7 +366,7 @@
 
     /* ===== Extracted from original script.js, lines 1418-4012 ===== */
     /* =====================================================
-    FLÈCHE
+    FLÈCHE FANCY
     ===================================================== */
 
     /*
@@ -394,11 +395,11 @@
 
 
     function isFancyArrow(object) {
+        return !!(object && object.arrowType === "fancy");
+    }
 
-        return !!(
-            object &&
-            object.arrowType === "fancy"
-        );
+    function isSimpleArrow(object) {
+        return !!(object && object.arrowType === "simple");
     }
 
 
@@ -963,9 +964,10 @@
         Le padding inclut le contour blanc
         et laisse une petite marge.
         */
+        const shadedContour = Math.max(5.5, strokeWidth * 0.88);
+
         const padding =
-            widths.outlineWidth +
-            8;
+            widths.outlineWidth + shadedContour * 3 + 3;
 
 
         const xs =
@@ -1059,7 +1061,7 @@
 
 
     /* =====================================================
-    CRÉATION DE LA FLÈCHE
+    CRÉATION DE LA FLÈCHE FANCY
     ===================================================== */
 
     function createFancyArrow(
@@ -1119,7 +1121,7 @@
         const localY2 =
             y2 -
             bounds.minY;
-
+        const shadedContour = Math.max(5.5, strokeWidth * 0.88);
 
         const arrow =
             new fabric.Path(
@@ -1150,14 +1152,10 @@
 
                     shadow:
                         new fabric.Shadow({
-
-                            color:
-                                "rgba(0,0,0,0.32)",
-
-                            blur: 5,
-
-                            offsetX: 2,
-                            offsetY: 2
+                            color: "rgba(35, 35, 35, 0.88)",
+                            blur: shadedContour,
+                            offsetX: 0,
+                            offsetY: 0
                         }),
 
 
@@ -1218,6 +1216,65 @@
 
 
     /* =====================================================
+    FLÈCHE SIMPLE — corps droit + pointe triangulaire
+    Les trois couches sont superposées exactement : gris,
+    blanc, puis couleur. Le groupe reste un objet unique.
+    ===================================================== */
+    function createSimpleArrow(x1, y1, x2, y2, color, strokeWidth, opacity = 1) {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const length = Math.hypot(dx, dy);
+        if (length < 1) return null;
+
+        const ux = dx / length;
+        const uy = dy / length;
+        const px = -uy;
+        const py = ux;
+        const shaft = Math.max(2.5, strokeWidth * 0.85);
+        const headWidth = Math.max(12, strokeWidth * 3.2);
+        const headLength = Math.min(length * 0.48, Math.max(18, strokeWidth * 4.2));
+        const baseX = x2 - ux * headLength;
+        const baseY = y2 - uy * headLength;
+        const points = [
+            { x: x1 + px * shaft / 2, y: y1 + py * shaft / 2 },
+            { x: baseX + px * shaft / 2, y: baseY + py * shaft / 2 },
+            { x: baseX + px * headWidth / 2, y: baseY + py * headWidth / 2 },
+            { x: x2, y: y2 },
+            { x: baseX - px * headWidth / 2, y: baseY - py * headWidth / 2 },
+            { x: baseX - px * shaft / 2, y: baseY - py * shaft / 2 },
+            { x: x1 - px * shaft / 2, y: y1 - py * shaft / 2 }
+        ];
+        const outlineWidth = Math.max(2, strokeWidth * 0.4);
+        const shadedContour = Math.max(5.5, strokeWidth * 0.88);
+        const padding = outlineWidth + shadedContour * 3 + 3;
+        const minX = Math.min(...points.map(p => p.x)) - padding;
+        const minY = Math.min(...points.map(p => p.y)) - padding;
+        const pathData = `M ${points.map(p => `${p.x - minX} ${p.y - minY}`).join(" L ")} Z`;
+
+        return new fabric.Path(pathData, {
+            left: minX, top: minY, originX: "left", originY: "top",
+            fill: color,
+            stroke: "#ffffff",
+            strokeWidth: outlineWidth,
+            strokeLineJoin: "round", strokeLineCap: "round",
+            // Contour gris diffus et uniforme, sans décalage directionnel.
+            shadow: new fabric.Shadow({
+                color: "rgba(35, 35, 35, 0.88)",
+                blur: shadedContour,
+                offsetX: 0,
+                offsetY: 0
+            }),
+            opacity,
+            selectable: true, evented: true,
+            hasControls: false, hasBorders: true,
+            lockScalingX: true, lockScalingY: true, lockRotation: true,
+            objectCaching: false,
+            arrowType: "simple", x1, y1, x2, y2,
+            arrowColor: color, arrowStrokeWidth: strokeWidth
+        });
+    }
+
+    /* =====================================================
     RECONSTRUCTION
     ===================================================== */
 
@@ -1229,19 +1286,19 @@
         y2
     ) {
 
+        const color = oldArrow.arrowColor || getColor();
+        const width = oldArrow.arrowStrokeWidth || getStrokeWidth();
+
+        if (isSimpleArrow(oldArrow)) {
+            return createSimpleArrow(
+                x1, y1, x2, y2,
+                color, width,
+                Number.isFinite(oldArrow.opacity) ? oldArrow.opacity : 1
+            );
+        }
+
         return createFancyArrow(
-
-            x1,
-            y1,
-
-            x2,
-            y2,
-
-            oldArrow.arrowColor ||
-                getColor(),
-
-            oldArrow.arrowStrokeWidth ||
-                getStrokeWidth()
+            x1, y1, x2, y2, color, width
         );
     }
 
@@ -1255,11 +1312,10 @@
     ) {
 
         if (
-            !isFancyArrow(object)
+            !isFancyArrow(object) && !isSimpleArrow(object)
         ) {
-
+            editingArrow = null;
             hideArrowHandles();
-
             return;
         }
 
@@ -1304,14 +1360,43 @@
     ) {
 
         if (
-            !isFancyArrow(object)
+            !isFancyArrow(object) && !isSimpleArrow(object)
         ) {
-
             hideArrowHandles();
-
             return;
         }
 
+        // Pour une flèche simple, les extrémités sont directement
+        // exprimées dans le repère du canvas. On les convertit via
+        // la matrice Fabric de l'objet (déplacement/zoom compris).
+        if (isSimpleArrow(object)) {
+            const pathOffset = object.pathOffset || new fabric.Point(0, 0);
+            const startLocal = new fabric.Point(
+                object.x1 - object.left - pathOffset.x,
+                object.y1 - object.top - pathOffset.y
+            );
+            const endLocal = new fabric.Point(
+                object.x2 - object.left - pathOffset.x,
+                object.y2 - object.top - pathOffset.y
+            );
+            const matrix = object.calcTransformMatrix();
+            const viewport = canvas.viewportTransform;
+            const startScreen = fabric.util.transformPoint(
+                fabric.util.transformPoint(startLocal, matrix), viewport
+            );
+            const endScreen = fabric.util.transformPoint(
+                fabric.util.transformPoint(endLocal, matrix), viewport
+            );
+            const canvasRect = canvas.upperCanvasEl.getBoundingClientRect();
+            const stageRect = stage.getBoundingClientRect();
+            const offsetX = canvasRect.left - stageRect.left;
+            const offsetY = canvasRect.top - stageRect.top;
+            arrowHandleStart.style.left = `${offsetX + startScreen.x}px`;
+            arrowHandleStart.style.top = `${offsetY + startScreen.y}px`;
+            arrowHandleEnd.style.left = `${offsetX + endScreen.x}px`;
+            arrowHandleEnd.style.top = `${offsetY + endScreen.y}px`;
+            return;
+        }
 
         /*
         -------------------------------------------------
@@ -1779,9 +1864,7 @@
 
             if (
                 editingArrow &&
-                isFancyArrow(
-                    editingArrow
-                )
+                (isFancyArrow(editingArrow) || isSimpleArrow(editingArrow))
             ) {
 
                 startArrowHandleDrag(
@@ -1808,9 +1891,7 @@
 
             if (
                 editingArrow &&
-                isFancyArrow(
-                    editingArrow
-                )
+                (isFancyArrow(editingArrow) || isSimpleArrow(editingArrow))
             ) {
 
                 startArrowHandleDrag(
@@ -2053,6 +2134,13 @@
                     getStrokeWidth()
                 );
         }
+        else if (currentTool === "simpleArrow") {
+            temporaryObject = createSimpleArrow(
+                drawStart.x, drawStart.y,
+                drawStart.x + 1, drawStart.y + 1,
+                getColor(), getStrokeWidth(), getStrokeOpacity()
+            );
+        }
 
 
         if (temporaryObject) {
@@ -2289,23 +2377,10 @@
         FLÈCHE
         ------------------------------------------------- */
 
-        else if (
-            currentTool ===
-            "arrow"
-        ) {
-
-            const newArrow =
-                createFancyArrow(
-
-                    drawStart.x,
-                    drawStart.y,
-
-                    x,
-                    y,
-
-                    getColor(),
-                    getStrokeWidth()
-                );
+        else if (currentTool === "arrow" || currentTool === "simpleArrow") {
+            const newArrow = currentTool === "simpleArrow"
+                ? createSimpleArrow(drawStart.x, drawStart.y, x, y, getColor(), getStrokeWidth(), getStrokeOpacity())
+                : createFancyArrow(drawStart.x, drawStart.y, x, y, getColor(), getStrokeWidth());
 
 
             if (!newArrow) {
@@ -2377,10 +2452,7 @@
         temporaryObject = null;
         freehandPoints = [];
 
-        if (
-            currentTool ===
-            "arrow"
-        ) {
+        if (currentTool === "arrow" || currentTool === "simpleArrow") {
 
             const dx =
                 object.x2 -
@@ -2421,7 +2493,7 @@
                 );
 
                 trackEvent('element_created', {
-                    element_type: 'arrow'
+                    element_type: currentTool === 'simpleArrow' ? 'simple_arrow' : 'arrow'
                 });
             }
 
@@ -2980,7 +3052,7 @@
 
             if (
                 object &&
-                isFancyArrow(object)
+                (isFancyArrow(object) || isSimpleArrow(object))
             ) {
 
                 editingArrow =
@@ -3013,7 +3085,7 @@
 
             if (
                 object &&
-                isFancyArrow(object)
+                (isFancyArrow(object) || isSimpleArrow(object))
             ) {
 
                 editingArrow =
@@ -3059,7 +3131,7 @@
 
 
             if (
-                !isFancyArrow(object)
+                !isFancyArrow(object) && !isSimpleArrow(object)
             ) {
                 return;
             }
@@ -3121,7 +3193,7 @@
 
 
             if (
-                isFancyArrow(object)
+                isFancyArrow(object) || isSimpleArrow(object)
             ) {
 
                 delete object.__previousLeft;

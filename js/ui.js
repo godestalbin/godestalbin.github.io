@@ -127,7 +127,19 @@ function syncControlsFromSelectedObject() {
         const thicknessWasEdited = document.activeElement === strokeWidthInput;
         let changed = false;
         selectedObjects.forEach(item => {
-            if (isFancyArrow(item)) {
+            if (isFancyArrow(item) || isSimpleArrow(item)) {
+                if (isSimpleArrow(item)) {
+                    const width = thicknessWasEdited ? newWidth : item.arrowStrokeWidth;
+                    item.set({
+                        fill: newColor,
+                        strokeWidth: Math.max(3, width * 0.58),
+                        opacity: getStrokeOpacity()
+                    });
+                    item.arrowColor = newColor;
+                    item.arrowStrokeWidth = width;
+                    changed = true;
+                    return;
+                }
                 item.arrowColor = newColor;
                 if (thicknessWasEdited) item.arrowStrokeWidth = newWidth;
                 item.set({
@@ -158,7 +170,7 @@ function syncControlsFromSelectedObject() {
     ------------------------------------------------- */
 
     if (
-        isFancyArrow(object)
+        isFancyArrow(object) || isSimpleArrow(object)
     ) {
 
         if (object.arrowColor) {
@@ -310,6 +322,25 @@ function updateSelectedObject(source = null) {
     /* -------------------------------------------------
        FLÈCHE
     ------------------------------------------------- */
+
+    if (isSimpleArrow(object)) {
+        const newArrow = createSimpleArrow(
+            object.x1, object.y1, object.x2, object.y2,
+            getColor(), getStrokeWidth(), getStrokeOpacity()
+        );
+        if (!newArrow) return;
+        const index = canvas.getObjects().indexOf(object);
+        if (index < 0) return;
+        canvas.remove(object);
+        canvas.insertAt(index, newArrow);
+        newArrow.set({ selectable: true, evented: true });
+        canvas.setActiveObject(newArrow);
+        canvas.renderAll();
+        syncControlsFromSelectedObject();
+        saveHistory();
+        updateStatus("Flèche simple modifiée");
+        return;
+    }
 
     if (
         isFancyArrow(object)

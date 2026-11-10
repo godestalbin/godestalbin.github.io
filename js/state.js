@@ -11,7 +11,7 @@ const CANVAS_HEIGHT = 750;
 
 const DEFAULT_COLOR = "#4751e1";
 const DEFAULT_STROKE_WIDTH = 6;
-const DEFAULT_STROKE_WIDTHS = { rectangle: 6, circle: 6, highlight: 2, felt: 10 };
+const DEFAULT_STROKE_WIDTHS = { rectangle: 6, circle: 6, highlight: 2, felt: 10, simpleArrow: 6 };
 
 
 /* =====================================================

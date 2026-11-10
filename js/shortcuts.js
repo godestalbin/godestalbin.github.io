@@ -384,6 +384,14 @@ document.addEventListener("keydown", event => {
         return;
     }
 
+    // Flèche simple : Shift+A.
+    if (!event.ctrlKey && !event.altKey && !event.metaKey && event.shiftKey && key === "a") {
+        event.preventDefault();
+        setTool("simpleArrow");
+        document.querySelectorAll(".toolbar-menu").forEach(menu => menu.removeAttribute("open"));
+        return;
+    }
+
     // Sélection rapide des outils : uniquement sans modificateur.
     if (!event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
         const toolByKey = {
