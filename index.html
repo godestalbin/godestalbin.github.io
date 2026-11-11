@@ -41,6 +41,8 @@
 <script src="js/blur.js" defer></script>
 <script src="js/history.js" defer></script>
 <script src="js/files.js" defer></script>
+<script src="js/fuze.js" defer></script>
+<script src="js/menu.js" defer></script>
 <script src="js/ui.js" defer></script>
 <script src="js/shortcuts.js" defer></script>
 <script src="js/main.js" defer></script>
@@ -62,6 +64,9 @@
         <summary>File <span aria-hidden="true">▾</span></summary>
         <div class="menu-panel">
             <button type="button" data-action="open-image">Ouvrir une image <kbd>Ctrl+O</kbd></button>
+            <button type="button" data-action="open-fuze">Ouvrir Fuze / Open Fuze file <kbd>Ctrl+Shift+O</kbd></button>
+            <button type="button" data-action="save-fuze">Enregistrer Fuze / Save as Fuze file <kbd>Ctrl+Shift+S</kbd></button>
+            <div class="menu-separator"></div>
             <button type="button" data-action="copy-png">Copier l’image annotée <kbd>Ctrl+Alt+C</kbd></button>
             <button type="button" data-action="save-png">Enregistrer en PNG <kbd>Ctrl+S</kbd></button>
             <div class="menu-separator"></div>
@@ -171,6 +176,7 @@
     </label>
 
     <input type="file" id="imageInput" accept="image/*" multiple hidden>
+    <input type="file" id="fuzeFileInput" accept=".fuze,application/json" hidden>
 
     <!-- Commandes invisibles conservées pour réutiliser les actions existantes. -->
     <div hidden aria-hidden="true">

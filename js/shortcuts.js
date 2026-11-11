@@ -351,6 +351,19 @@ document.addEventListener("keydown", event => {
 
     const key = event.key.toLowerCase();
 
+    // Ouvrir / enregistrer un document Fuze.
+    if (event.ctrlKey && event.shiftKey && !event.altKey && key === "o") {
+        event.preventDefault();
+        chooseFuzeFile();
+        return;
+    }
+
+    if (event.ctrlKey && event.shiftKey && !event.altKey && key === "s") {
+        event.preventDefault();
+        saveFuzeFile();
+        return;
+    }
+
     // Actions de fichier : raccourcis choisis pour éviter les commandes Chrome.
     if (event.ctrlKey && !event.shiftKey && !event.altKey && key === "o") {
         event.preventDefault();
