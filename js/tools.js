@@ -2866,6 +2866,17 @@
                 isEditableArrow(object)
             ) {
 
+                // Les flèches s'éditent uniquement avec leurs handles dédiés.
+                // Ne pas afficher le cadre Fabric (poignées de taille/rotation),
+                // notamment après le rechargement d'un fichier .fuze.
+                object.set({
+                    hasControls: false,
+                    hasBorders: false,
+                    lockScalingX: true,
+                    lockScalingY: true,
+                    lockRotation: true
+                });
+
                 editingArrow =
                     object;
 
@@ -2898,6 +2909,17 @@
                 object &&
                 isEditableArrow(object)
             ) {
+
+                // Les flèches s'éditent uniquement avec leurs handles dédiés.
+                // Ne pas afficher le cadre Fabric (poignées de taille/rotation),
+                // notamment après le rechargement d'un fichier .fuze.
+                object.set({
+                    hasControls: false,
+                    hasBorders: false,
+                    lockScalingX: true,
+                    lockScalingY: true,
+                    lockRotation: true
+                });
 
                 editingArrow =
                     object;
