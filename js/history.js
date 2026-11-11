@@ -16,6 +16,11 @@ const SERIALIZED_PROPERTIES = [
 
     "arrowColor",
     "arrowStrokeWidth",
+
+    // Coordonnées locales indispensables à l'édition des Smart Arrows
+    // après rechargement d'un fichier .fuze.
+    "arrowPointStart",
+    "arrowPointEnd",
     "fuzeTool",
     "fuzeNumber",
     "blurType",
