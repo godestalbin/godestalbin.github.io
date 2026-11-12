@@ -454,60 +454,146 @@ document.addEventListener("keydown", event => {
     }
 });
 
-document.addEventListener(
-    "keydown",
-    event => {
+// Masquer temporairement les poignées pendant le déplacement clavier.
+// Le délai est réinitialisé à chaque répétition de touche : les poignées
+// ne réapparaissent qu'une fois le déplacement terminé.
+let arrowHandlesRestoreTimer = null;
+const ARROW_HANDLES_RESTORE_DELAY = 400;
 
-        /*
-           Ne pas intercepter les flèches lorsqu'on
-           écrit dans un champ texte.
-        */
+function temporarilyHideArrowHandlesForKeyboardMove() {
+    const activeObject = canvas.getActiveObject();
 
-        const target =
-            event.target;
-
-        if (
-            target instanceof HTMLInputElement ||
-            target instanceof HTMLTextAreaElement ||
-            target.isContentEditable
-        ) {
-            return;
-        }
-
-
-        /*
-           Flèche du haut :
-           monter l'objet d'un niveau.
-        */
-
-        if (
-            event.key === "ArrowUp"
-        ) {
-
-            event.preventDefault();
-
-            bringSelectedObjectForward();
-
-            return;
-        }
-
-
-        /*
-           Flèche du bas :
-           descendre l'objet d'un niveau.
-        */
-
-        if (
-            event.key === "ArrowDown"
-        ) {
-
-            event.preventDefault();
-
-            sendSelectedObjectBackward();
-
-            return;
-        }
-
+    if (
+        !activeObject ||
+        (activeObject.arrowType !== "simple" && activeObject.arrowType !== "fancy") ||
+        editingArrow !== activeObject
+    ) {
+        return;
     }
-);
 
+    if (arrowHandlesRestoreTimer !== null) {
+        clearTimeout(arrowHandlesRestoreTimer);
+        arrowHandlesRestoreTimer = null;
+    }
+
+    hideArrowHandles();
+
+    const arrow = activeObject;
+    arrowHandlesRestoreTimer = setTimeout(() => {
+        arrowHandlesRestoreTimer = null;
+
+        // Ne réafficher les poignées que si cette même flèche est toujours
+        // sélectionnée et en cours d'édition.
+        if (canvas.getActiveObject() === arrow && editingArrow === arrow) {
+            showArrowHandles(arrow);
+        }
+    }, ARROW_HANDLES_RESTORE_DELAY);
+}
+
+
+function moveSelectedObjectsByKeyboard(dx, dy) {
+
+    const selection = getSelectedObjectAndBorder();
+
+    if (!selection || !selection.objects.length) {
+        return false;
+    }
+
+    // Déplacer ensemble l'image et sa bordure éventuelle.
+    // Pour une sélection multiple Fabric.js, l'objet actif est
+    // l'ActiveSelection : modifier sa position déplace tous ses objets.
+    selection.objects.forEach(object => {
+        const previousLeft = object.left || 0;
+        const previousTop = object.top || 0;
+
+        object.set({
+            left: previousLeft + dx,
+            top: previousTop + dy
+        });
+        object.setCoords();
+
+        // Le déplacement clavier ne déclenche pas les événements Fabric
+        // object:moving. Les flèches utilisent cet événement pour mettre à
+        // jour leurs coordonnées et repositionner leurs poignées.
+        if (object.arrowType === "simple" || object.arrowType === "fancy") {
+            object.__previousLeft = previousLeft;
+            object.__previousTop = previousTop;
+
+            canvas.fire("object:moving", { target: object });
+
+            delete object.__previousLeft;
+            delete object.__previousTop;
+        }
+    });
+
+    canvas.requestRenderAll();
+    saveHistory();
+
+    return true;
+}
+
+
+document.addEventListener("keydown", event => {
+
+    const target = event.target;
+
+    // Ne pas intercepter les flèches dans les champs ou pendant
+    // l'édition directe d'un texte Fabric.js.
+    if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target.isContentEditable ||
+        (editingText && editingText.isEditing)
+    ) {
+        return;
+    }
+
+    // Ctrl + flèche : modifier le z-index.
+    if (
+        event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        !event.shiftKey &&
+        (event.key === "ArrowUp" || event.key === "ArrowDown")
+    ) {
+        if (!canvas.getActiveObject()) {
+            return;
+        }
+
+        event.preventDefault();
+
+        if (event.key === "ArrowUp") {
+            bringSelectedObjectForward();
+        } else {
+            sendSelectedObjectBackward();
+        }
+
+        return;
+    }
+
+    // Flèches seules : déplacement précis d'un pixel.
+    if (
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        !event.shiftKey
+    ) {
+        const movements = {
+            ArrowUp: [0, -1],
+            ArrowRight: [1, 0],
+            ArrowDown: [0, 1],
+            ArrowLeft: [-1, 0]
+        };
+
+        const movement = movements[event.key];
+
+        if (!movement || !canvas.getActiveObject()) {
+            return;
+        }
+
+        event.preventDefault();
+        temporarilyHideArrowHandlesForKeyboardMove();
+        moveSelectedObjectsByKeyboard(movement[0], movement[1]);
+    }
+});
