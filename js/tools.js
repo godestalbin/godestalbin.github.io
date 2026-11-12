@@ -1314,6 +1314,66 @@
     }
 
 
+    // Dernières positions du curseur pour réévaluer le magnétisme dès que Ctrl change.
+    let lastArrowDrawPoint = null;
+    let lastArrowHandlePoint = null;
+    let lastDrawingPoint = null;
+    let rawDrawStart = null;
+
+    // Grille de 10 px dans les coordonnées de la scène.
+    function snapToGrid(value) {
+        return Math.round(value / 10) * 10;
+    }
+
+    function snapPointToGrid(point) {
+        return { x: snapToGrid(point.x), y: snapToGrid(point.y) };
+    }
+
+    function snapArrowEndpoint(startX, startY, endX, endY, enabled) {
+        if (!enabled) return { x: endX, y: endY };
+
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const length = Math.hypot(dx, dy);
+        if (length < 0.001) return { x: endX, y: endY };
+
+        const angle = Math.atan2(dy, dx);
+        const step = Math.PI / 18; // 10 degrés
+        const snappedAngle = Math.round(angle / step) * step;
+        return {
+            x: startX + Math.cos(snappedAngle) * length,
+            y: startY + Math.sin(snappedAngle) * length
+        };
+    }
+
+    function snapArrowLength(startX, startY, endX, endY, enabled) {
+        if (!enabled) return { x: endX, y: endY };
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const length = Math.hypot(dx, dy);
+        if (length < 0.001) return { x: endX, y: endY };
+        const snappedLength = Math.max(10, Math.round(length / 10) * 10);
+        const scale = snappedLength / length;
+        return { x: startX + dx * scale, y: startY + dy * scale };
+    }
+
+    function updateTemporaryArrowAtPoint(point, ctrlKey, shiftKey = false) {
+        if (!drawing || !temporaryObject || !lastArrowDrawPoint) return;
+        let endpoint = snapArrowLength(drawStart.x, drawStart.y, point.x, point.y, shiftKey);
+        endpoint = snapArrowEndpoint(drawStart.x, drawStart.y, endpoint.x, endpoint.y, ctrlKey);
+        const snapped = endpoint;
+        const newArrow = currentTool === "simpleArrow"
+            ? createSimpleArrow(drawStart.x, drawStart.y, snapped.x, snapped.y, getColor(), getStrokeWidth(), getStrokeOpacity())
+            : createFancyArrow(drawStart.x, drawStart.y, snapped.x, snapped.y, getColor(), getStrokeWidth());
+        if (!newArrow) return;
+        const index = canvas.getObjects().indexOf(temporaryObject);
+        canvas.remove(temporaryObject);
+        temporaryObject = newArrow;
+        temporaryObject.set({ selectable: false, evented: false });
+        canvas.insertAt(Math.max(0, index), temporaryObject);
+        canvas.requestRenderAll();
+    }
+
     /* =====================================================
     POIGNÉES
     ===================================================== */
@@ -1462,20 +1522,15 @@
     }
 
 
-    function moveArrowHandle(
-        event
-    ) {
-
-        if (
-            !draggingArrowHandle ||
-            !editingArrow
-        ) {
-            return;
-        }
-
-
-        // Fabric gère lui-même les coordonnées écran, le zoom et le viewport.
+    function moveArrowHandle(event) {
+        if (!draggingArrowHandle || !editingArrow) return;
         const point = canvas.getScenePoint(event);
+        lastArrowHandlePoint = { x: point.x, y: point.y };
+        updateArrowHandleAtPoint(lastArrowHandlePoint, !!event.ctrlKey, !!event.shiftKey);
+    }
+
+    function updateArrowHandleAtPoint(point, ctrlKey, shiftKey = false) {
+        if (!draggingArrowHandle || !editingArrow) return;
 
 
         let x1 =
@@ -1527,6 +1582,20 @@
                 );
         }
 
+
+        // Shift : longueur au multiple de 10 px le plus proche.
+        // Ctrl : angle au multiple de 10° le plus proche. Les deux sont cumulables.
+        if (draggingArrowHandle === "start") {
+            let snapped = snapArrowLength(x2, y2, x1, y1, shiftKey);
+            snapped = snapArrowEndpoint(x2, y2, snapped.x, snapped.y, ctrlKey);
+            x1 = snapped.x;
+            y1 = snapped.y;
+        } else {
+            let snapped = snapArrowLength(x1, y1, x2, y2, shiftKey);
+            snapped = snapArrowEndpoint(x1, y1, snapped.x, snapped.y, ctrlKey);
+            x2 = snapped.x;
+            y2 = snapped.y;
+        }
 
         /*
         Empêcher une flèche nulle.
@@ -1625,6 +1694,7 @@
 
         draggingArrowHandle = null;
         arrowHandleDragOffset = null;
+        lastArrowHandlePoint = null;
 
         document.body.style.userSelect =
             "";
@@ -1749,12 +1819,11 @@
 
         drawing = true;
 
-
-        drawStart = {
-
-            x: pointer.x,
-            y: pointer.y
-        };
+        rawDrawStart = { x: pointer.x, y: pointer.y };
+        drawStart = event.e?.shiftKey
+            ? snapPointToGrid(rawDrawStart)
+            : { ...rawDrawStart };
+        lastDrawingPoint = { x: pointer.x, y: pointer.y };
 
 
         temporaryObject = null;
@@ -1973,267 +2042,80 @@
     }
 
 
-    function drawingMove(event) {
+    function updateTemporaryDrawingAtPoint(point, shiftKey = false, ctrlKey = false) {
+        if (!drawing || !temporaryObject) return;
 
-        if (
-            !drawing ||
-            !temporaryObject
-        ) {
+        // Shift aimante aussi l'origine du tracé. Repartir du point brut permet
+        // d'activer ou de désactiver Shift à tout moment pendant le dessin.
+        if (rawDrawStart) {
+            drawStart = shiftKey
+                ? snapPointToGrid(rawDrawStart)
+                : { ...rawDrawStart };
+        }
+
+        const x = point.x;
+        const y = point.y;
+
+        if (currentTool === "felt") return;
+
+        if (currentTool === "arrow" || currentTool === "simpleArrow") {
+            lastArrowDrawPoint = { x, y };
+            updateTemporaryArrowAtPoint({ x, y }, ctrlKey, shiftKey);
             return;
         }
 
+        // Les formes rectangulaires et l'ellipse utilisent deux dimensions
+        // indépendantes, chacune arrondie au multiple de 10 px le plus proche.
+        let dx = x - drawStart.x;
+        let dy = y - drawStart.y;
+        if (shiftKey) {
+            const snapDimension = value => {
+                const magnitude = Math.round(Math.abs(value) / 10) * 10;
+                return Math.sign(value) * magnitude;
+            };
+            dx = snapDimension(dx);
+            dy = snapDimension(dy);
+        }
 
-        const pointer =
-            canvas.getScenePoint(
-                event.e
-            );
+        const endX = drawStart.x + dx;
+        const endY = drawStart.y + dy;
+        const left = Math.min(drawStart.x, endX);
+        const top = Math.min(drawStart.y, endY);
+        const width = Math.abs(dx);
+        const height = Math.abs(dy);
 
+        if (currentTool === "rectangle" || currentTool === "highlight" || currentTool === "blur") {
+            temporaryObject.set({ left, top, width, height });
+        } else if (currentTool === "circle") {
+            temporaryObject.set({ left, top, rx: width / 2, ry: height / 2 });
+        }
 
-        const x =
-            pointer.x;
+        canvas.requestRenderAll();
+    }
 
-        const y =
-            pointer.y;
+    function drawingMove(event) {
+        if (!drawing || !temporaryObject) return;
+
+        const pointer = canvas.getScenePoint(event.e);
+        const point = { x: pointer.x, y: pointer.y };
+        lastDrawingPoint = point;
 
         if (currentTool === "felt") {
             const last = freehandPoints[freehandPoints.length - 1];
-            if (!last || Math.hypot(x - last.x, y - last.y) >= 1.2) {
-                freehandPoints.push({ x, y });
+            if (!last || Math.hypot(point.x - last.x, point.y - last.y) >= 1.2) {
+                freehandPoints.push(point);
                 refreshFreehandPreview();
             }
             return;
         }
 
-        /* -------------------------------------------------
-        RECTANGLE
-        ------------------------------------------------- */
-
-        if (
-            currentTool ===
-            "rectangle"
-        ) {
-
-            const left =
-                Math.min(
-                    drawStart.x,
-                    x
-                );
-
-            const top =
-                Math.min(
-                    drawStart.y,
-                    y
-                );
-
-            const width =
-                Math.abs(
-                    x -
-                    drawStart.x
-                );
-
-            const height =
-                Math.abs(
-                    y -
-                    drawStart.y
-                );
-
-
-            temporaryObject.set({
-
-                left,
-                top,
-
-                width,
-                height
-            });
-        }
-
-        /* -------------------------------------------------
-        CERCLE
-        ------------------------------------------------- */
-
-        else if (
-            currentTool ===
-            "circle"
-        ) {
-
-            const left =
-                Math.min(
-                    drawStart.x,
-                    x
-                );
-
-            const top =
-                Math.min(
-                    drawStart.y,
-                    y
-                );
-
-            const width =
-                Math.abs(
-                    x -
-                    drawStart.x
-                );
-
-            const height =
-                Math.abs(
-                    y -
-                    drawStart.y
-                );
-
-
-            temporaryObject.set({
-
-                left,
-                top,
-
-                rx:
-                    width / 2,
-
-                ry:
-                    height / 2
-            });
-        }
-
-
-        /* -------------------------------------------------
-        SURLIGNAGE
-        ------------------------------------------------- */
-
-        else if (
-            currentTool ===
-            "highlight"
-        ) {
-
-            const left =
-                Math.min(
-                    drawStart.x,
-                    x
-                );
-
-            const top =
-                Math.min(
-                    drawStart.y,
-                    y
-                );
-
-            const width =
-                Math.abs(
-                    x -
-                    drawStart.x
-                );
-
-            const height =
-                Math.abs(
-                    y -
-                    drawStart.y
-                );
-
-
-            temporaryObject.set({
-
-                left,
-                top,
-
-                width,
-                height
-            });
-        }
-
-        /* -------------------------------------------------
-        BLUR
-        ------------------------------------------------- */
-
-        else if (
-            currentTool ===
-            "blur"
-        ) {
-
-            const left =
-                Math.min(
-                    drawStart.x,
-                    x
-                );
-
-            const top =
-                Math.min(
-                    drawStart.y,
-                    y
-                );
-
-            const width =
-                Math.abs(
-                    x -
-                    drawStart.x
-                );
-
-            const height =
-                Math.abs(
-                    y -
-                    drawStart.y
-                );
-
-
-            temporaryObject.set({
-
-                left,
-                top,
-
-                width,
-                height
-            });
-        }
-
-        /* -------------------------------------------------
-        FLÈCHE
-        ------------------------------------------------- */
-
-        else if (currentTool === "arrow" || currentTool === "simpleArrow") {
-            const newArrow = currentTool === "simpleArrow"
-                ? createSimpleArrow(drawStart.x, drawStart.y, x, y, getColor(), getStrokeWidth(), getStrokeOpacity())
-                : createFancyArrow(drawStart.x, drawStart.y, x, y, getColor(), getStrokeWidth());
-
-
-            if (!newArrow) {
-                return;
-            }
-
-
-            const index =
-                canvas.getObjects()
-                    .indexOf(
-                        temporaryObject
-                    );
-
-
-            canvas.remove(
-                temporaryObject
-            );
-
-
-            temporaryObject =
-                newArrow;
-
-
-            temporaryObject.set({
-
-                selectable: false,
-                evented: false
-            });
-
-
-            canvas.insertAt(
-                index,
-                temporaryObject
-            );
-        }
-
-
+        updateTemporaryDrawingAtPoint(point, !!event.e?.shiftKey, !!event.e?.ctrlKey);
         canvas.renderAll();
     }
 
-
     function finishDrawing() {
+        lastArrowDrawPoint = null;
+        lastDrawingPoint = null;
 
         if (!drawing) {
             return;
@@ -2241,6 +2123,7 @@
 
 
         drawing = false;
+        rawDrawStart = null;
 
         if (currentTool === "felt") {
             if (freehandPoints.length < 2) {
@@ -2496,6 +2379,28 @@
     canvas.on("mouse:over", () => {
         if (eyedropperActive) {
             updateEyedropperCursor();
+        }
+    });
+
+    // Réévaluer le tracé et les poignées dès que Ctrl ou Shift change,
+    // même si la souris reste immobile.
+    document.addEventListener("keydown", event => {
+        if (event.repeat || (event.key !== "Control" && event.key !== "Shift")) return;
+        if (drawing && lastDrawingPoint) {
+            updateTemporaryDrawingAtPoint(lastDrawingPoint, !!event.shiftKey, !!event.ctrlKey);
+        }
+        if (draggingArrowHandle && lastArrowHandlePoint) {
+            updateArrowHandleAtPoint(lastArrowHandlePoint, !!event.ctrlKey, !!event.shiftKey);
+        }
+    });
+
+    document.addEventListener("keyup", event => {
+        if (event.key !== "Control" && event.key !== "Shift") return;
+        if (drawing && lastDrawingPoint) {
+            updateTemporaryDrawingAtPoint(lastDrawingPoint, !!event.shiftKey, !!event.ctrlKey);
+        }
+        if (draggingArrowHandle && lastArrowHandlePoint) {
+            updateArrowHandleAtPoint(lastArrowHandlePoint, !!event.ctrlKey, !!event.shiftKey);
         }
     });
 
@@ -2841,8 +2746,21 @@
     // Keep borders attached to their images while moving, scaling, or rotating.
     ["object:moving", "object:scaling", "object:rotating", "object:modified"].forEach(eventName => {
         canvas.on(eventName, event => {
-            if (event.target && event.target.type === "image") {
-                syncImageBorder(event.target);
+            const object = event.target;
+
+            if (eventName === "object:moving" && object && event.e?.shiftKey) {
+                // Aimante la position de l'objet ou du groupe sélectionné
+                // à la grille de 10 px tant que Shift est enfoncée.
+                const snappedLeft = snapToGrid(object.left);
+                const snappedTop = snapToGrid(object.top);
+                if (object.left !== snappedLeft || object.top !== snappedTop) {
+                    object.set({ left: snappedLeft, top: snappedTop });
+                    object.setCoords();
+                }
+            }
+
+            if (object && object.type === "image") {
+                syncImageBorder(object);
                 canvas.requestRenderAll();
             }
         });
