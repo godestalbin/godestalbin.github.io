@@ -261,6 +261,14 @@
 
     function setTool(tool) {
 
+        // Tout changement d'outil (menu ou raccourci clavier) quitte la pipette.
+        // Le prélèvement de couleur, lui, ne passe pas par setTool et conserve
+        // donc la pipette active pour permettre plusieurs prélèvements successifs.
+        if (eyedropperActive) {
+            cancelEyedropper();
+            updateEyedropperCursor();
+        }
+
         currentTool = tool;
 
         document
@@ -2316,12 +2324,22 @@
             if (eyedropperActive) {
                 const color = sampleCanvasColor(event.e);
 
+                // Fabric peut désélectionner l'objet quand le clic de la pipette
+                // tombe sur le fond du canvas. On restaure donc la sélection
+                // mémorisée avant d'appliquer la nouvelle couleur.
+                restoreEyedropperSelection();
+
                 if (color) {
                     colorInput.value = color;
                     colorInput.dispatchEvent(new Event("input", { bubbles: true }));
                     colorInput.dispatchEvent(new Event("change", { bubbles: true }));
-                    cancelEyedropper();
-                    updateStatus("Couleur prélevée : " + color);
+
+                    // updateSelectedObject peut remplacer une flèche : mémoriser
+                    // la sélection mise à jour permet de réutiliser la pipette.
+                    rememberEyedropperSelection();
+                    // La pipette reste active pour permettre plusieurs prélèvements
+                    // successifs sans devoir la réactiver après chaque couleur.
+                    updateStatus("Couleur prélevée : " + color + " — pipette toujours active");
                 } else {
                     updateStatus("Impossible de prélever cette couleur.");
                 }

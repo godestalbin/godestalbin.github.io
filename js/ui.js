@@ -4,12 +4,39 @@
    PIPETTE — PRÉLÈVEMENT D'UN PIXEL DU CANVAS
 ===================================================== */
 
+// La pipette ne doit pas perdre la sélection courante lorsque l'utilisateur
+// clique sur le canvas pour prélever une couleur.
+let eyedropperSelection = [];
+
+function rememberEyedropperSelection() {
+    eyedropperSelection = canvas ? canvas.getActiveObjects().slice() : [];
+}
+
+function restoreEyedropperSelection() {
+    if (!canvas || !eyedropperSelection.length) return;
+
+    // Un objet peut avoir été remplacé pendant l'application d'une couleur
+    // (notamment les flèches) : on ne restaure que les objets encore présents.
+    const currentObjects = canvas.getObjects();
+    const objects = eyedropperSelection.filter(object => currentObjects.includes(object));
+    if (!objects.length) return;
+
+    if (objects.length === 1) {
+        canvas.setActiveObject(objects[0]);
+    } else {
+        canvas.setActiveObject(new fabric.ActiveSelection(objects, { canvas }));
+    }
+
+    canvas.requestRenderAll();
+}
+
 function activateEyedropper() {
     if (eyedropperActive) {
         cancelEyedropper();
         return;
     }
 
+    rememberEyedropperSelection();
     eyedropperActive = true;
     eyedropperButton.classList.add("active");
     stage.classList.add("eyedropper-active");
@@ -21,8 +48,10 @@ function activateEyedropper() {
 
 function cancelEyedropper() {
     eyedropperActive = false;
+    eyedropperSelection = [];
     eyedropperButton.classList.remove("active");
     stage.classList.remove("eyedropper-active");
+    updateEyedropperCursor();
 }
 
 function updateEyedropperCursor() {
