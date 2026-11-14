@@ -472,6 +472,26 @@ document
 
 /* ===== Extracted from original script.js, lines 5479-5563 ===== */
 /* =====================================================
+   POSITION DU POINTEUR POUR LE COLLAGE
+===================================================== */
+
+// Ctrl+V ne fournit pas la position de la souris : on conserve donc le
+// dernier emplacement connu, converti par Fabric (zoom et déplacement inclus).
+window.__fuzeLastPasteCanvasPointer = null;
+document.addEventListener("mousemove", event => {
+    if (typeof canvas !== "undefined" && canvas) {
+        window.__fuzeLastPasteCanvasPointer = canvas.getPointer(event);
+    }
+});
+
+function getCanvasPastePoint() {
+    return window.__fuzeLastPasteCanvasPointer || {
+        x: CANVAS_WIDTH / 2,
+        y: CANVAS_HEIGHT / 2
+    };
+}
+
+/* =====================================================
    COLLAGE D'UNE IMAGE DEPUIS LE PRESSE-PAPIERS
 ===================================================== */
 
@@ -517,12 +537,14 @@ document.addEventListener("paste", async (event) => {
             // « No resize » conserve la taille originale de l'image.
             const scale = getImageImportScale();
 
+            const pastePoint = getCanvasPastePoint();
+
             img.set({
                 scaleX: scale,
                 scaleY: scale,
 
-                left: CANVAS_WIDTH / 2,
-                top: CANVAS_HEIGHT / 2,
+                left: pastePoint.x,
+                top: pastePoint.y,
 
                 originX: "center",
                 originY: "center",

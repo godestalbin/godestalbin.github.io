@@ -252,11 +252,228 @@ document
 
 
 /* ===== Extracted from original script.js, lines 5158-5386 ===== */
+
+/* =====================================================
+   COPIER / COLLER DES OBJETS
+===================================================== */
+
+let fuzeObjectClipboard = null;
+let fuzePasteCount = 0;
+
+function getClipboardSourceObjects() {
+    const active = canvas.getActiveObject();
+    if (!active) return [];
+
+    const selected = active.type === "activeselection"
+        ? active.getObjects()
+        : [active];
+
+    const objects = canvas.getObjects();
+    const result = [...selected];
+
+    // Une bordure d'image fait partie de l'objet copié.
+    selected.forEach(object => {
+        if (object.fuzeBorderId) {
+            const border = objects.find(
+                item => item.fuzeBorderOwnerId === object.fuzeBorderId
+            );
+            if (border && !result.includes(border)) result.push(border);
+        }
+    });
+
+    return result.sort(
+        (a, b) => objects.indexOf(a) - objects.indexOf(b)
+    );
+}
+
+async function copySelectedObjects() {
+    const selected = getClipboardSourceObjects();
+    if (!selected.length) return;
+
+    try {
+        // ActiveSelection place temporairement ses objets dans le repère du
+        // groupe. La désélection les remet dans le repère du canvas avant clone.
+        const hadMultipleSelection = canvas.getActiveObject()?.type === "activeselection";
+        if (hadMultipleSelection) canvas.discardActiveObject();
+
+        try {
+            // Les objets sont clonés en mémoire : le presse-papiers reste
+            // indépendant des originaux et des collages ultérieurs.
+            fuzeObjectClipboard = await Promise.all(
+                selected.map(object => object.clone(SERIALIZED_PROPERTIES))
+            );
+        } finally {
+            // Restaurer exactement la sélection source après la copie.
+            if (hadMultipleSelection) {
+                canvas.setActiveObject(new fabric.ActiveSelection(selected, { canvas }));
+                canvas.requestRenderAll();
+            }
+        }
+        fuzePasteCount = 0;
+        updateStatus(selected.length > 1
+            ? `${selected.length} objets copiés`
+            : "Objet copié");
+    } catch (error) {
+        console.error("Erreur lors de la copie des objets :", error);
+        updateStatus("Impossible de copier les objets");
+    }
+}
+
+async function pasteCopiedObjects() {
+    if (!fuzeObjectClipboard?.length) return;
+
+    try {
+        const pasted = await Promise.all(
+            fuzeObjectClipboard.map(object =>
+                object.clone(SERIALIZED_PROPERTIES)
+            )
+        );
+
+        // Centrer la copie (ou la sélection complète) sous le pointeur.
+        // Les coordonnées sont dans le repère du canvas : zoom et déplacement
+        // de la vue sont donc pris en compte.
+        const pastePoint = getCanvasPastePoint();
+        pasted.forEach(object => object.setCoords());
+        const bounds = pasted.map(object => object.getBoundingRect());
+        const minLeft = Math.min(...bounds.map(rect => rect.left));
+        const minTop = Math.min(...bounds.map(rect => rect.top));
+        const maxRight = Math.max(...bounds.map(rect => rect.left + rect.width));
+        const maxBottom = Math.max(...bounds.map(rect => rect.top + rect.height));
+        const offsetX = pastePoint.x - (minLeft + maxRight) / 2;
+        const offsetY = pastePoint.y - (minTop + maxBottom) / 2;
+
+        // Recréer les identifiants des bordures pour éviter tout lien
+        // avec les images originales ou les collages précédents.
+        const borderIds = new Map();
+        pasted.forEach(object => {
+            if (object.fuzeBorderId) {
+                borderIds.set(
+                    object.fuzeBorderId,
+                    `fuze-border-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+                );
+            }
+        });
+
+        pasted.forEach(object => {
+            object.set({
+                left: (object.left || 0) + offsetX,
+                top: (object.top || 0) + offsetY
+            });
+
+            // Les extrémités des flèches sont mémorisées dans le repère
+            // du canvas (contrairement à arrowPointStart/End, locaux au Path).
+            // Il faut donc les décaler elles aussi, sinon les handles des
+            // flèches collées restent ancrés sur les coordonnées d'origine.
+            ["x1", "y1", "x2", "y2"].forEach(property => {
+                if (typeof object[property] === "number") {
+                    object[property] += property === "x1" || property === "x2"
+                        ? offsetX
+                        : offsetY;
+                }
+            });
+
+            if (object.fuzeBorderId && borderIds.has(object.fuzeBorderId)) {
+                object.fuzeBorderId = borderIds.get(object.fuzeBorderId);
+            }
+            if (object.fuzeBorderOwnerId && borderIds.has(object.fuzeBorderOwnerId)) {
+                object.fuzeBorderOwnerId = borderIds.get(object.fuzeBorderOwnerId);
+            }
+            object.setCoords();
+            canvas.add(object);
+        });
+
+        canvas.discardActiveObject();
+
+        if (pasted.length === 1) {
+            canvas.setActiveObject(pasted[0]);
+        } else {
+            const selection = new fabric.ActiveSelection(pasted, { canvas });
+            canvas.setActiveObject(selection);
+        }
+
+        fuzePasteCount++;
+        canvas.requestRenderAll();
+        saveHistory();
+        updateEmptyMessage();
+        updateStatus(pasted.length > 1
+            ? `${pasted.length} objets collés`
+            : "Objet collé");
+    } catch (error) {
+        console.error("Erreur lors du collage des objets :", error);
+        updateStatus("Impossible de coller les objets");
+    }
+}
+
+function deleteSelectedObjects() {
+    const active = canvas.getActiveObject();
+    if (!active) return false;
+
+    const selected = active.type === "activeselection"
+        ? [...active.getObjects()]
+        : [active];
+
+    const allObjects = canvas.getObjects();
+    const toDelete = new Set(selected);
+
+    // Supprimer également la bordure liée à une image sélectionnée.
+    selected.forEach(object => {
+        if (object.fuzeBorderId) {
+            const border = allObjects.find(
+                item => item.fuzeBorderOwnerId === object.fuzeBorderId
+            );
+            if (border) toDelete.add(border);
+        }
+        // Si seule la bordure est sélectionnée, supprimer aussi son image
+        // pour conserver le comportement d'objet composé.
+        if (object.fuzeBorderOwnerId) {
+            const image = allObjects.find(
+                item => item.fuzeBorderId === object.fuzeBorderOwnerId
+            );
+            if (image) toDelete.add(image);
+        }
+    });
+
+    canvas.discardActiveObject();
+    toDelete.forEach(object => canvas.remove(object));
+
+    if (editingArrow && toDelete.has(editingArrow)) {
+        editingArrow = null;
+        hideArrowHandles();
+    }
+
+    canvas.requestRenderAll();
+    saveHistory();
+    updateEmptyMessage();
+    updateUndoRedoButtons();
+    return true;
+}
+
+
 /* =====================================================
    CLAVIER
 ===================================================== */
 
 document.addEventListener("keydown", event => {
+
+    // Échap revient au mode Select. Pendant l'édition d'un texte, il quitte
+    // également l'édition Fabric.js avant de changer d'outil.
+    if (event.key === "Escape") {
+        const target = event.target;
+        const isFormField =
+            target instanceof HTMLInputElement ||
+            target instanceof HTMLTextAreaElement ||
+            target instanceof HTMLSelectElement ||
+            target.isContentEditable;
+
+        if (!isFormField || (editingText && editingText.isEditing)) {
+            event.preventDefault();
+            if (editingText && editingText.isEditing) {
+                editingText.exitEditing();
+            }
+            setTool("select");
+            return;
+        }
+    }
 
     /* =================================================
        UNDO
@@ -351,6 +568,71 @@ document.addEventListener("keydown", event => {
 
     const key = event.key.toLowerCase();
 
+    // Ctrl+A : sélectionner tous les éléments présents sur le canvas.
+    // Les poignées des flèches sont des éléments HTML et ne font donc pas
+    // partie de canvas.getObjects(). On exclut seulement l'objet temporaire
+    // utilisé pendant un dessin en cours.
+    if (
+        event.ctrlKey &&
+        !event.shiftKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        key === "a"
+    ) {
+        if (editingText && editingText.isEditing) {
+            return;
+        }
+
+        // Ctrl+A bascule également vers Select avant de créer la sélection.
+        // setTool("select") réactive la sélection des objets sans effacer
+        // l'ActiveSelection qui sera construite juste après.
+        setTool("select");
+
+        const objects = canvas.getObjects().filter(object =>
+            object !== temporaryObject && object.visible !== false
+        );
+
+        event.preventDefault();
+
+        if (!objects.length) {
+            canvas.discardActiveObject();
+            canvas.requestRenderAll();
+            updateStatus("Aucun objet à sélectionner");
+            return;
+        }
+
+        canvas.discardActiveObject();
+
+        if (objects.length === 1) {
+            canvas.setActiveObject(objects[0]);
+        } else {
+            canvas.setActiveObject(
+                new fabric.ActiveSelection(objects, { canvas })
+            );
+        }
+
+        canvas.requestRenderAll();
+        updateStatus("Tous les objets sélectionnés");
+        return;
+    }
+
+    // Copier / coller les objets sélectionnés (presse-papiers interne Fuze).
+    if (event.ctrlKey && !event.altKey && !event.metaKey && key === "c") {
+        if (!(editingText && editingText.isEditing) && canvas.getActiveObject()) {
+            event.preventDefault();
+            copySelectedObjects();
+            return;
+        }
+    }
+
+    if (event.ctrlKey && !event.altKey && !event.metaKey && key === "v") {
+        if (!(editingText && editingText.isEditing) && fuzeObjectClipboard?.length) {
+            event.preventDefault();
+            pasteCopiedObjects();
+            return;
+        }
+    }
+
     // Ouvrir / enregistrer un document Fuze.
     if (event.ctrlKey && event.shiftKey && !event.altKey && key === "o") {
         event.preventDefault();
@@ -434,25 +716,12 @@ document.addEventListener("keydown", event => {
         event.key === "Delete" ||
         event.key === "Backspace"
     ) {
-
-        const activeObject =
-            canvas.getActiveObject();
-
-        if (activeObject) {
-
-            canvas.remove(activeObject);
-            canvas.discardActiveObject();
-
-            canvas.requestRenderAll();
-
-            saveHistory();
-
-            updateEmptyMessage();
+        if (canvas.getActiveObject()) {
+            event.preventDefault();
+            deleteSelectedObjects();
         }
-
         return;
-    }
-});
+    }});
 
 // Masquer temporairement les poignées pendant le déplacement clavier.
 // Le délai est réinitialisé à chaque répétition de touche : les poignées

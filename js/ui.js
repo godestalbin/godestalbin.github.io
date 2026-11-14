@@ -123,6 +123,11 @@ function syncControlsFromSelectedObject() {
 
     const object = canvas.getActiveObject();
     const selectedObjects = canvas.getActiveObjects();
+
+    // En multi-sélection, les contrôles restent des paramètres de style
+    // indépendants de la sélection : ne pas remplacer leurs valeurs.
+    if (selectedObjects.length > 1) return;
+
     syncThicknessControl();
 
     if (!object) return;
@@ -150,49 +155,6 @@ function syncControlsFromSelectedObject() {
         return;
     }
 
-    if (selectedObjects.length > 1) {
-        const newWidth = getStrokeWidth();
-        const newColor = getColor();
-        const thicknessWasEdited = document.activeElement === strokeWidthInput;
-        let changed = false;
-        selectedObjects.forEach(item => {
-            if (isFancyArrow(item) || isSimpleArrow(item)) {
-                if (isSimpleArrow(item)) {
-                    const width = thicknessWasEdited ? newWidth : item.arrowStrokeWidth;
-                    item.set({
-                        fill: newColor,
-                        strokeWidth: Math.max(3, width * 0.58),
-                        opacity: getStrokeOpacity()
-                    });
-                    item.arrowColor = newColor;
-                    item.arrowStrokeWidth = width;
-                    changed = true;
-                    return;
-                }
-                item.arrowColor = newColor;
-                if (thicknessWasEdited) item.arrowStrokeWidth = newWidth;
-                item.set({
-                    stroke: newColor,
-                    ...(thicknessWasEdited ? { strokeWidth: newWidth } : {})
-                });
-                changed = true;
-            } else if (["rect", "ellipse", "path"].includes(item.type)) {
-                item.set({
-                    stroke: item.fuzeTool === "highlight" ? "rgba(255,210,30,0.85)" : newColor,
-                    ...(thicknessWasEdited ? { strokeWidth: newWidth } : {}),
-                    opacity: getStrokeOpacity()
-                });
-                changed = true;
-            }
-        });
-        if (changed) {
-            canvas.requestRenderAll();
-            syncControlsFromSelectedObject();
-            saveHistory();
-            updateStatus("Épaisseur appliquée aux objets sélectionnés");
-        }
-        return;
-    }
 
     /* -------------------------------------------------
        FLÈCHE
@@ -201,6 +163,10 @@ function syncControlsFromSelectedObject() {
     if (
         isFancyArrow(object) || isSimpleArrow(object)
     ) {
+        // Une sélection simple doit toujours réafficher l'épaisseur propre à
+        // cette flèche, même après la désélection d'une multi-sélection.
+        strokeWidthInput.disabled = false;
+        strokeWidthInput.title = "Épaisseur";
 
         if (object.arrowColor) {
 
@@ -337,6 +303,141 @@ function updateSelectedObject(source = null) {
         return;
     }
 
+    // En multi-sélection, les indicateurs du bandeau conservent leur dernière
+    // valeur. Une action explicite sur un contrôle applique cette valeur à
+    // tous les objets compatibles, sans relire ensuite le style de la sélection.
+    const selectedObjects = canvas.getActiveObjects();
+    if (selectedObjects.length > 1) {
+        const colorWasEdited = source === "color";
+        const opacityWasEdited = source === "opacity";
+        const widthWasEdited = source === "strokeWidth";
+        const fontSizeWasEdited = source === "fontSize";
+        if (!colorWasEdited && !opacityWasEdited && !widthWasEdited && !fontSizeWasEdited) return;
+
+        const newColor = getColor();
+        const newOpacity = getStrokeOpacity();
+        const newWidth = getStrokeWidth();
+        const newFontSize = getFontSize();
+
+        // Changer arrowStrokeWidth seul ne suffit pas : l'épaisseur d'une flèche
+        // est intégrée à sa géométrie (corps, pointe, contour et ombre). Il faut
+        // donc reconstruire les flèches après avoir libéré l'ActiveSelection.
+        const rebuildSelectedArrows = widthWasEdited && selectedObjects.some(isEditableArrow);
+        if (rebuildSelectedArrows) canvas.discardActiveObject();
+        const updatedSelection = [];
+
+        selectedObjects.forEach(item => {
+            // Flèches : la couleur du corps ne doit jamais toucher au contour blanc.
+            if (isEditableArrow(item)) {
+                if (widthWasEdited) {
+                    const arrowColor = colorWasEdited ? newColor : (item.arrowColor || item.fill || newColor);
+                    const arrowOpacity = opacityWasEdited ? newOpacity : (item.opacity ?? 1);
+                    const replacement = isSimpleArrow(item)
+                        ? createSimpleArrow(item.x1, item.y1, item.x2, item.y2, arrowColor, newWidth, arrowOpacity)
+                        : createFancyArrow(item.x1, item.y1, item.x2, item.y2, arrowColor, newWidth, arrowOpacity);
+                    if (replacement) {
+                        replacement.set({
+                            opacity: arrowOpacity,
+                            selectable: true,
+                            evented: true,
+                            hasControls: false,
+                            hasBorders: false
+                        });
+                        const index = canvas.getObjects().indexOf(item);
+                        if (index >= 0) {
+                            canvas.remove(item);
+                            canvas.insertAt(index, replacement);
+                            updatedSelection.push(replacement);
+                        } else {
+                            updatedSelection.push(item);
+                        }
+                    } else {
+                        updatedSelection.push(item);
+                    }
+                } else {
+                    if (colorWasEdited) {
+                        item.set({ fill: newColor });
+                        item.arrowColor = newColor;
+                    }
+                    if (opacityWasEdited) item.set({ opacity: newOpacity });
+                    item.setCoords();
+                    updatedSelection.push(item);
+                }
+                return;
+            }
+            updatedSelection.push(item);
+
+            // Numéro entouré : les propriétés sont portées par le cercle et le texte internes.
+            if (item.fuzeTool === "number" && typeof item.getObjects === "function") {
+                const parts = item.getObjects();
+                const circle = parts.find(part => part.type === "circle");
+                const label = parts.find(part => part.type === "text");
+                if (colorWasEdited) {
+                    if (circle) circle.set({ stroke: newColor });
+                    if (label) label.set({ fill: newColor });
+                }
+                if (widthWasEdited && circle) circle.set({ strokeWidth: newWidth });
+                if (fontSizeWasEdited && label) label.set({ fontSize: newFontSize });
+                if (opacityWasEdited) item.set({ opacity: newOpacity });
+                item.setCoords();
+                return;
+            }
+
+            // Texte libre.
+            if (item.type === "i-text" || item.type === "text" || item.type === "textbox") {
+                const properties = {};
+                if (colorWasEdited) properties.fill = newColor;
+                if (opacityWasEdited) properties.opacity = newOpacity;
+                if (fontSizeWasEdited) properties.fontSize = newFontSize;
+                item.set(properties);
+                item.setCoords();
+                return;
+            }
+
+            // Images : couleur, épaisseur et transparence concernent leur bordure associée.
+            if (item.type === "image") {
+                if (colorWasEdited || widthWasEdited || opacityWasEdited) {
+                    const border = canvas.getObjects().find(
+                        candidate => candidate.fuzeBorderOwnerId === item.fuzeBorderId
+                    );
+                    if (border) {
+                        const properties = {};
+                        if (colorWasEdited) properties.stroke = newColor;
+                        if (widthWasEdited) properties.strokeWidth = newWidth;
+                        if (opacityWasEdited) properties.opacity = newOpacity;
+                        border.set(properties);
+                        border.setCoords();
+                    } else if (colorWasEdited || widthWasEdited) {
+                        updateImageBorderStyle(item, newColor, newWidth);
+                    }
+                }
+                return;
+            }
+
+            // Formes, traits libres et surlignages.
+            if (["rect", "ellipse", "path"].includes(item.type)) {
+                const properties = {};
+                if (colorWasEdited) {
+                    properties.stroke = item.fuzeTool === "highlight"
+                        ? "rgba(255,210,30,0.85)"
+                        : newColor;
+                }
+                if (opacityWasEdited) properties.opacity = newOpacity;
+                if (widthWasEdited) properties.strokeWidth = newWidth;
+                item.set(properties);
+                item.setCoords();
+            }
+        });
+
+        if (rebuildSelectedArrows && updatedSelection.length > 1) {
+            // Reconstitue la multi-sélection avec les nouvelles instances de flèches.
+            canvas.setActiveObject(new fabric.ActiveSelection(updatedSelection, { canvas }));
+        }
+        canvas.requestRenderAll();
+        saveHistory();
+        updateStatus("Style appliqué aux objets sélectionnés");
+        return;
+    }
 
     /* -------------------------------------------------
        NUMÉRO ENTOURÉ
@@ -396,7 +497,8 @@ function updateSelectedObject(source = null) {
                 object.y2,
 
                 newColor,
-                newStrokeWidth
+                newStrokeWidth,
+                getStrokeOpacity()
             );
 
 
@@ -659,7 +761,7 @@ document.addEventListener("keydown", event => {
 
 colorInput.addEventListener(
     "input",
-    updateSelectedObject
+    () => updateSelectedObject("color")
 );
 
 strokeWidthInput.addEventListener(
@@ -669,9 +771,9 @@ strokeWidthInput.addEventListener(
 
 strokeOpacityInput.addEventListener("input", () => {
     updateStrokeOpacityLabel();
-    updateSelectedObject();
+    updateSelectedObject("opacity");
 });
-strokeOpacityInput.addEventListener("change", updateSelectedObject);
+strokeOpacityInput.addEventListener("change", () => updateSelectedObject("opacity"));
 updateStrokeOpacityLabel();
 syncThicknessControl();
 

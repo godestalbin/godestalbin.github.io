@@ -217,14 +217,19 @@
             fuzeBorderOwnerId: id
         });
         canvas.add(border);
-        // Keep the image above its border and preserve all other overlay ordering.
-        // canvas.moveObjectTo(image, Math.max(0, canvas.getObjects().indexOf(border) + 1));
+        // Keep the border immediately above its image so the outline is
+        // rendered over the image corners without changing the stacking of
+        // unrelated canvas objects.
         const objects = canvas.getObjects();
         const imageIndex = objects.indexOf(image);
 
         if (imageIndex !== -1) {
             canvas.moveObjectTo(border, imageIndex + 1);
         }
+        // Reassert these flags after insertion/reordering: the image remains
+        // the only interactive object in the image + border pair.
+        border.set({ selectable: false, evented: false, hoverCursor: "default" });
+        border.setCoords();
         canvas.setActiveObject(image);
         canvas.requestRenderAll();
         saveHistory();
@@ -293,9 +298,12 @@
 
             canvas.forEachObject(
                 object => {
-
-                    object.selectable = true;
-                    object.evented = true;
+                    // Les bordures d'image restent purement décoratives,
+                    // même en mode Sélection : le clic traverse la bordure
+                    // et cible directement l'image située dessous.
+                    const isImageBorder = object.fuzeTool === "border" || object.fuzeBorderOwnerId;
+                    object.selectable = !isImageBorder;
+                    object.evented = !isImageBorder;
                 }
             );
 
@@ -313,9 +321,12 @@
 
             canvas.forEachObject(
                 object => {
-
-                    object.selectable = false;
-                    object.evented = false;
+                    // Les objets restent détectables pendant qu'un outil de
+                    // dessin est actif : un clic dessus doit pouvoir basculer
+                    // en mode Sélection. Les bordures d'image restent décoratives.
+                    const isImageBorder = object.fuzeTool === "border" || object.fuzeBorderOwnerId;
+                    object.selectable = !isImageBorder;
+                    object.evented = !isImageBorder;
                 }
             );
 
@@ -1061,7 +1072,8 @@
         x2,
         y2,
         color,
-        strokeWidth
+        strokeWidth,
+        opacity = 1
     ) {
 
         const geometry =
@@ -1130,6 +1142,8 @@
 
 
                     fill: color,
+
+                    opacity,
 
                     stroke: "#ffffff",
 
@@ -1317,7 +1331,8 @@
         return createFancyArrow(
             x1, y1, x2, y2,
             color,
-            strokeWidth
+            strokeWidth,
+            oldArrow.opacity ?? 1
         );
     }
 
@@ -1372,7 +1387,7 @@
         const snapped = endpoint;
         const newArrow = currentTool === "simpleArrow"
             ? createSimpleArrow(drawStart.x, drawStart.y, snapped.x, snapped.y, getColor(), getStrokeWidth(), getStrokeOpacity())
-            : createFancyArrow(drawStart.x, drawStart.y, snapped.x, snapped.y, getColor(), getStrokeWidth());
+            : createFancyArrow(drawStart.x, drawStart.y, snapped.x, snapped.y, getColor(), getStrokeWidth(), getStrokeOpacity());
         if (!newArrow) return;
         const index = canvas.getObjects().indexOf(temporaryObject);
         canvas.remove(temporaryObject);
@@ -1426,6 +1441,38 @@
         );
     }
 
+
+    /* -----------------------------------------------------
+    SYNCHRONISATION DES EXTRÉMITÉS PENDANT LE DÉPLACEMENT D'UN GROUPE
+    ----------------------------------------------------- */
+
+    function isActiveSelectionObject(object) {
+        return !!object && (
+            object.type === "activeSelection" ||
+            object instanceof fabric.ActiveSelection
+        );
+    }
+
+    // Mémorise l'origine du groupe au moment où la sélection multiple est créée.
+    // x1/y1/x2/y2 restent des coordonnées de scène : on les translate donc du
+    // déplacement réel du groupe, sans les recalculer depuis la matrice des Paths.
+    function rememberActiveSelectionPosition(selection) {
+        if (!isActiveSelectionObject(selection)) return;
+        selection.__fuzeLastLeft = selection.left;
+        selection.__fuzeLastTop = selection.top;
+    }
+
+    function translateActiveSelectionArrowEndpoints(selection, dx, dy) {
+        if (!isActiveSelectionObject(selection) || (!dx && !dy)) return;
+
+        selection.getObjects().forEach(object => {
+            if (!isEditableArrow(object)) return;
+            object.x1 += dx;
+            object.y1 += dy;
+            object.x2 += dx;
+            object.y2 += dy;
+        });
+    }
 
     /* -----------------------------------------------------
     POSITIONNEMENT DES POIGNÉES
@@ -1487,6 +1534,8 @@
     DRAG POIGNÉES
     ===================================================== */
 
+    let arrowHandleDragGeometry = null;
+
     function startArrowHandleDrag(
         event,
         which
@@ -1503,6 +1552,16 @@
 
         draggingArrowHandle =
             which;
+
+        // Géométrie de référence pour Alt : l'extrémité opposée reste fixe
+        // et la longueur initiale est conservée pendant toute la rotation.
+        const initialDx = editingArrow.x2 - editingArrow.x1;
+        const initialDy = editingArrow.y2 - editingArrow.y1;
+        arrowHandleDragGeometry = {
+            fixedX: which === "start" ? editingArrow.x2 : editingArrow.x1,
+            fixedY: which === "start" ? editingArrow.y2 : editingArrow.y1,
+            length: Math.hypot(initialDx, initialDy)
+        };
 
         // Mémorise le décalage de prise pour éviter tout saut au premier mouvement.
         if (isSimpleArrow(editingArrow) || isFancyArrow(editingArrow)) {
@@ -1534,10 +1593,15 @@
         if (!draggingArrowHandle || !editingArrow) return;
         const point = canvas.getScenePoint(event);
         lastArrowHandlePoint = { x: point.x, y: point.y };
-        updateArrowHandleAtPoint(lastArrowHandlePoint, !!event.ctrlKey, !!event.shiftKey);
+        updateArrowHandleAtPoint(
+            lastArrowHandlePoint,
+            !!event.ctrlKey,
+            !!event.shiftKey,
+            !!event.altKey
+        );
     }
 
-    function updateArrowHandleAtPoint(point, ctrlKey, shiftKey = false) {
+    function updateArrowHandleAtPoint(point, ctrlKey, shiftKey = false, altKey = false) {
         if (!draggingArrowHandle || !editingArrow) return;
 
 
@@ -1591,9 +1655,39 @@
         }
 
 
-        // Shift : longueur au multiple de 10 px le plus proche.
-        // Ctrl : angle au multiple de 10° le plus proche. Les deux sont cumulables.
-        if (draggingArrowHandle === "start") {
+        // Alt : rotation autour de l'extrémité opposée, longueur initiale constante.
+        // Alt + Ctrl : même rotation, avec un angle accroché tous les 10 degrés.
+        if (altKey && arrowHandleDragGeometry) {
+            const { fixedX, fixedY, length } = arrowHandleDragGeometry;
+            let movingX = draggingArrowHandle === "start" ? x1 : x2;
+            let movingY = draggingArrowHandle === "start" ? y1 : y2;
+            let dx = movingX - fixedX;
+            let dy = movingY - fixedY;
+            let angle = Math.atan2(dy, dx);
+
+            if (ctrlKey) {
+                const step = Math.PI / 18;
+                angle = Math.round(angle / step) * step;
+            }
+
+            movingX = fixedX + Math.cos(angle) * length;
+            movingY = fixedY + Math.sin(angle) * length;
+
+            if (draggingArrowHandle === "start") {
+                x1 = movingX;
+                y1 = movingY;
+                x2 = fixedX;
+                y2 = fixedY;
+            } else {
+                x1 = fixedX;
+                y1 = fixedY;
+                x2 = movingX;
+                y2 = movingY;
+            }
+        } else {
+            // Shift : longueur au multiple de 10 px le plus proche.
+            // Ctrl : angle au multiple de 10° le plus proche. Les deux sont cumulables.
+            if (draggingArrowHandle === "start") {
             let snapped = snapArrowLength(x2, y2, x1, y1, shiftKey);
             snapped = snapArrowEndpoint(x2, y2, snapped.x, snapped.y, ctrlKey);
             x1 = snapped.x;
@@ -1603,6 +1697,7 @@
             snapped = snapArrowEndpoint(x1, y1, snapped.x, snapped.y, ctrlKey);
             x2 = snapped.x;
             y2 = snapped.y;
+            }
         }
 
         /*
@@ -1702,6 +1797,7 @@
 
         draggingArrowHandle = null;
         arrowHandleDragOffset = null;
+        arrowHandleDragGeometry = null;
         lastArrowHandlePoint = null;
 
         document.body.style.userSelect =
@@ -2019,7 +2115,8 @@
                     drawStart.y + 1,
 
                     getColor(),
-                    getStrokeWidth()
+                    getStrokeWidth(),
+                    getStrokeOpacity()
                 );
         }
         else if (currentTool === "simpleArrow") {
@@ -2299,17 +2396,8 @@
             saveHistory();
             updateEmptyMessage();
         }
-        
-
-        if (
-            currentTool !==
-            "select"
-        ) {
-
-            setTool(
-                "select"
-            );
-        }
+        // L’outil reste actif après la création pour permettre
+        // d’enchaîner plusieurs créations. S ou Échap revient à Select.
     }
 
 
@@ -2343,6 +2431,19 @@
                 } else {
                     updateStatus("Impossible de prélever cette couleur.");
                 }
+                return;
+            }
+
+            // Si un outil de création est actif mais que le clic touche un
+            // objet existant, privilégier cet objet : revenir immédiatement
+            // en mode Sélection au lieu de dessiner/ajouter un élément dessus.
+            if (
+                currentTool !== "select" &&
+                event.target &&
+                event.target.fuzeTool !== "border" &&
+                !event.target.fuzeBorderOwnerId
+            ) {
+                setTool("select");
                 return;
             }
 
@@ -2400,25 +2501,25 @@
         }
     });
 
-    // Réévaluer le tracé et les poignées dès que Ctrl ou Shift change,
+    // Réévaluer le tracé et les poignées dès que Ctrl, Shift ou Alt change,
     // même si la souris reste immobile.
     document.addEventListener("keydown", event => {
-        if (event.repeat || (event.key !== "Control" && event.key !== "Shift")) return;
+        if (event.repeat || !["Control", "Shift", "Alt"].includes(event.key)) return;
         if (drawing && lastDrawingPoint) {
             updateTemporaryDrawingAtPoint(lastDrawingPoint, !!event.shiftKey, !!event.ctrlKey);
         }
         if (draggingArrowHandle && lastArrowHandlePoint) {
-            updateArrowHandleAtPoint(lastArrowHandlePoint, !!event.ctrlKey, !!event.shiftKey);
+            updateArrowHandleAtPoint(lastArrowHandlePoint, !!event.ctrlKey, !!event.shiftKey, !!event.altKey);
         }
     });
 
     document.addEventListener("keyup", event => {
-        if (event.key !== "Control" && event.key !== "Shift") return;
+        if (!["Control", "Shift", "Alt"].includes(event.key)) return;
         if (drawing && lastDrawingPoint) {
             updateTemporaryDrawingAtPoint(lastDrawingPoint, !!event.shiftKey, !!event.ctrlKey);
         }
         if (draggingArrowHandle && lastArrowHandlePoint) {
-            updateArrowHandleAtPoint(lastArrowHandlePoint, !!event.ctrlKey, !!event.shiftKey);
+            updateArrowHandleAtPoint(lastArrowHandlePoint, !!event.ctrlKey, !!event.shiftKey, !!event.altKey);
         }
     });
 
@@ -2700,17 +2801,8 @@
         ================================================= */
 
         saveHistory();
-
-
-        /* =================================================
-        RETOUR AU MODE SÉLECTION
-        ================================================= */
-
-        setTool(
-            "select"
-        );
-
-
+        // Le mode Texte reste actif pour permettre plusieurs créations.
+        // S ou Échap permet de revenir explicitement au mode Select.
         updateEmptyMessage();
     }
 
@@ -2828,7 +2920,9 @@
             }
 
 
+            rememberActiveSelectionPosition(canvas.getActiveObject());
             syncControlsFromSelectedObject();
+            queueMicrotask(() => syncControlsFromSelectedObject());
         }
     );
 
@@ -2872,7 +2966,9 @@
             }
 
 
+            rememberActiveSelectionPosition(canvas.getActiveObject());
             syncControlsFromSelectedObject();
+            queueMicrotask(() => syncControlsFromSelectedObject());
         }
     );
 
@@ -2898,6 +2994,30 @@
             const object =
                 event.target;
 
+            // Fabric déclenche object:moving sur l'ActiveSelection lors d'un
+            // déplacement multiple, et non sur chacun de ses objets enfants.
+            // La matrice de la flèche inclut la transformation du groupe :
+            // recalculer sa position permet de suivre les handles en temps réel.
+            if (isActiveSelectionObject(object)) {
+                // Le groupe ne fait que translater ses enfants (pas de scale/rotation).
+                // On applique exactement ce delta aux coordonnées de scène des flèches.
+                // Cela évite les conversions de matrice qui désynchronisent les handles
+                // lorsque Fabric détruit ensuite l'ActiveSelection.
+                if (!Number.isFinite(object.__fuzeLastLeft) || !Number.isFinite(object.__fuzeLastTop)) {
+                    rememberActiveSelectionPosition(object);
+                }
+
+                const dx = object.left - object.__fuzeLastLeft;
+                const dy = object.top - object.__fuzeLastTop;
+                translateActiveSelectionArrowEndpoints(object, dx, dy);
+                object.__fuzeLastLeft = object.left;
+                object.__fuzeLastTop = object.top;
+
+                if (editingArrow && object.getObjects().includes(editingArrow)) {
+                    positionArrowHandles(editingArrow);
+                }
+                return;
+            }
 
             if (
                 !isEditableArrow(object)
@@ -2960,6 +3080,17 @@
             const object =
                 event.target;
 
+            // Repositionnement final après le déplacement de l'ActiveSelection.
+            if (isActiveSelectionObject(object)) {
+                // Les coordonnées x1/y1/x2/y2 ont déjà été translatées à chaque
+                // événement object:moving. Ne pas les recalculer ici : à ce stade,
+                // Fabric peut encore exposer les transformations temporaires du groupe.
+                rememberActiveSelectionPosition(object);
+                if (editingArrow && object.getObjects().includes(editingArrow)) {
+                    positionArrowHandles(editingArrow);
+                }
+                return;
+            }
 
             if (
                 isEditableArrow(object)
@@ -2979,6 +3110,23 @@
         }
     );
 
+
+    // Événement Fabric standard déclenché à la fin du déplacement du groupe.
+    // On mémorise les coordonnées de scène de chaque flèche avant la
+    // destruction de l'ActiveSelection lors de la désélection.
+    canvas.on("object:modified", event => {
+        const object = event.target;
+        if (isActiveSelectionObject(object)) {
+            // Les coordonnées des flèches ont été mises à jour par delta pendant
+            // le déplacement. On ne touche pas à leur géométrie au commit.
+            rememberActiveSelectionPosition(object);
+            if (editingArrow && object.getObjects().includes(editingArrow)) {
+                positionArrowHandles(editingArrow);
+            }
+            delete object.__fuzeLastLeft;
+            delete object.__fuzeLastTop;
+        }
+    });
 
     /* ===== Extracted from original script.js, lines 4460-4564 ===== */
     /* =====================================================
