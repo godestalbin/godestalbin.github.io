@@ -1,277 +1,369 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<!-- Analytics and advertising are loaded only on a hosted site.
-     This avoids waiting for third-party requests when testing via file:// locally. -->
-<script>
-    if (location.protocol !== "file:") {
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-KCKN5KPES3');
-
-        const gaScript = document.createElement('script');
-        gaScript.async = true;
-        gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-KCKN5KPES3';
-        document.head.appendChild(gaScript);
-
-        const adsScript = document.createElement('script');
-        adsScript.async = true;
-        adsScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6392049906379676';
-        adsScript.crossOrigin = 'anonymous';
-        document.head.appendChild(adsScript);
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Fuze — annotez vos captures et vos images, clarifiez vos idées et partagez des retours visuels précis.">
+  <title>Fuze — Faites passer vos idées au premier coup d’œil</title>
+  <style>
+    :root {
+      --gold: #edc13a;
+      --sand: #e0c477;
+      --red: #ad0404;
+      --brown: #8b6948;
+      --sage: #b9b99f;
+      --green: #426a54;
+      --ink: #252a24;
+      --muted: #687168;
+      --paper: #f8f7f1;
+      --white: #fffefa;
+      --line: rgba(66,106,84,.17);
+      --shadow: 0 24px 70px rgba(38,54,41,.13);
     }
-</script>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Fuze – Free Online Image Annotation Tool</title>
-<meta name="description"
-      content="Annotate images and screenshots online for free.
-      Add arrows, text, shapes, highlights and blur sensitive details.
-      Export your images as PNG or copy it in the clipboard.">
-<link rel="icon" type="image/png" href="favicon.png">
-<link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/fabric@6.9.0/dist/index.min.js" defer></script>
-<script src="js/analytics.js" defer></script>
-<script src="js/i18n.js" defer></script>
-<script src="js/state.js" defer></script>
-<script src="js/canvas.js" defer></script>
-<script src="js/tools.js" defer></script>
-<script src="js/blur.js" defer></script>
-<script src="js/history.js" defer></script>
-<script src="js/files.js" defer></script>
-<script src="js/fuze.js" defer></script>
-<script src="js/menu.js" defer></script>
-<script src="js/ui.js" defer></script>
-<script src="js/shortcuts.js" defer></script>
-<script src="js/main.js" defer></script>
-<script src="js/help.js" defer></script>
-
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; }
+    .wrap { width: min(1160px, calc(100% - 48px)); margin: 0 auto; }
+    .topbar {
+      position: sticky; top: 0; z-index: 10;
+      background: rgba(248,247,241,.88); backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--line);
+    }
+    nav { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: inline-flex; align-items: center; gap: 11px; font-size: 1.35rem; font-weight: 850; letter-spacing: -.06em; }
+    .brand-mark {
+      width: 35px; height: 35px; border-radius: 11px; display: grid; place-items: center;
+      color: var(--ink); background: var(--gold); box-shadow: 4px 4px 0 var(--green);
+      font-weight: 950; transform: rotate(-5deg);
+    }
+    .navlinks { display: flex; align-items: center; gap: 30px; color: #586258; font-size: .93rem; font-weight: 650; }
+    .navlinks a:hover { color: var(--green); }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+      border: 0; border-radius: 999px; padding: 13px 21px; font-weight: 800;
+      transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+      cursor: pointer;
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn-dark { color: white; background: var(--green); box-shadow: 0 8px 20px rgba(66,106,84,.2); }
+    .btn-dark:hover { background: #345641; box-shadow: 0 12px 25px rgba(66,106,84,.25); }
+    .btn-yellow { color: var(--ink); background: var(--gold); box-shadow: 0 8px 20px rgba(237,193,58,.22); }
+    .btn-outline { border: 1px solid var(--line); background: rgba(255,254,250,.65); }
+    .hero { padding: 88px 0 82px; overflow: hidden; position: relative; }
+    .hero:before {
+      content: ""; position: absolute; width: 540px; height: 540px; border-radius: 50%;
+      right: -230px; top: -230px; background: radial-gradient(circle, rgba(224,196,119,.32), transparent 68%);
+      pointer-events: none;
+    }
+    .hero-grid { display: grid; grid-template-columns: .92fr 1.08fr; align-items: center; gap: 56px; position: relative; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 9px; padding: 7px 12px;
+      border: 1px solid rgba(139,105,72,.22); border-radius: 999px;
+      color: var(--brown); background: rgba(224,196,119,.16);
+      text-transform: uppercase; letter-spacing: .12em; font-size: .72rem; font-weight: 850;
+    }
+    .eyebrow:before { content: ""; width: 7px; height: 7px; background: var(--red); border-radius: 50%; }
+    h1 { margin: 22px 0 20px; max-width: 600px; font-size: clamp(2.8rem, 5vw, 4.8rem); line-height: .99; letter-spacing: -.065em; }
+    h1 span { color: var(--green); position: relative; white-space: nowrap; }
+    h1 span:after { content: ""; position: absolute; height: 9px; left: 0; right: 0; bottom: -7px; border-radius: 100%; background: var(--gold); transform: rotate(-1.5deg); z-index: -1; }
+    .hero-copy { max-width: 510px; color: var(--muted); font-size: 1.13rem; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+    .micro { margin-top: 17px; color: #7b8178; font-size: .82rem; }
+    .visual { position: relative; min-width: 0; }
+    .editor {
+      position: relative; padding: 13px; border-radius: 22px; background: #202821;
+      box-shadow: var(--shadow); transform: rotate(1.2deg);
+    }
+    .editor-bar { height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 7px 10px; color: #d9e0d7; font-size: .68rem; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #778276; }
+    .editor-name { margin-left: 9px; opacity: .8; }
+    .editor-body { display: block; overflow: hidden; border-radius: 13px; background: #f2f0e8; line-height: 0; }
+    .demo-screen { display: block; width: 100%; height: auto; border-radius: 13px; }
+    .toolbar { background: #e4e5dc; padding: 12px 8px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .tool { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 7px; color: #526153; font-size: 14px; font-weight: 800; }
+    .tool.active { background: var(--gold); color: #252a24; box-shadow: 0 2px 0 rgba(0,0,0,.12); }
+    .canvas { padding: 25px 20px; position: relative; display: grid; place-items: center; }
+    .mock-window { width: 88%; height: 245px; background: #fff; border: 1px solid #d7d9d1; border-radius: 9px; box-shadow: 0 8px 25px rgba(0,0,0,.08); overflow: hidden; position: relative; }
+    .mock-head { height: 23px; border-bottom: 1px solid #eceee8; display: flex; align-items: center; gap: 4px; padding: 0 9px; }
+    .mock-head i { display: block; width: 5px; height: 5px; border-radius: 50%; background: #c6c9bf; }
+    .mock-content { padding: 20px; }
+    .mock-title { width: 54%; height: 11px; border-radius: 5px; background: #455b4a; margin-bottom: 14px; }
+    .mock-line { height: 6px; border-radius: 5px; background: #e6e9e1; margin: 8px 0; }
+    .mock-line.short { width: 65%; }
+    .mock-card { position: absolute; right: 20px; bottom: 17px; width: 38%; height: 77px; border-radius: 6px; background: #e5e9df; }
+    .annot { position: absolute; border: 3px solid var(--red); border-radius: 5px; left: 15%; top: 36%; width: 48%; height: 31%; }
+    .annot-label { position: absolute; top: -13px; left: 9px; background: var(--red); color: white; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
+    .annot-arrow { position: absolute; right: 18%; top: 27%; color: var(--red); font-size: 43px; font-weight: 900; transform: rotate(18deg); }
+    .annot-note { position: absolute; right: 8%; top: 48%; background: var(--gold); padding: 6px 9px; border-radius: 5px; font-size: 9px; font-weight: 850; transform: rotate(-3deg); box-shadow: 2px 3px 0 rgba(0,0,0,.1); }
+    .float-tag { position: absolute; z-index: 2; padding: 10px 14px; background: var(--white); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 30px rgba(38,54,41,.1); font-size: .78rem; font-weight: 800; }
+    .tag-one { left: -28px; top: 15%; transform: rotate(-5deg); color: var(--green); }
+    .tag-two { right: -20px; bottom: 8%; transform: rotate(4deg); color: var(--red); }
+    .trust-strip { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: rgba(255,254,250,.58); }
+    .trust-inner { display: flex; justify-content: center; align-items: center; gap: 28px; flex-wrap: wrap; padding: 21px 0; color: #667064; font-size: .87rem; font-weight: 700; }
+    .trust-inner span { display: inline-flex; align-items: center; gap: 8px; }
+    .check { color: var(--green); font-weight: 950; }
+    section { padding: 90px 0; }
+    .section-head { max-width: 690px; margin: 0 auto 45px; text-align: center; }
+    .kicker { color: var(--red); font-size: .75rem; letter-spacing: .15em; text-transform: uppercase; font-weight: 900; }
+    h2 { margin: 12px 0 14px; font-size: clamp(2rem, 3.7vw, 3.2rem); line-height: 1.05; letter-spacing: -.055em; }
+    .section-head p { color: var(--muted); font-size: 1.05rem; margin: 0; }
+    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 17px; }
+    .feature {
+      padding: 25px; border: 1px solid var(--line); border-radius: 17px; background: var(--white);
+      min-height: 205px; transition: transform .2s, box-shadow .2s;
+    }
+    .feature:hover { transform: translateY(-4px); box-shadow: 0 15px 35px rgba(38,54,41,.08); }
+    .feature-icon { width: 43px; height: 43px; display: grid; place-items: center; border-radius: 13px; background: rgba(237,193,58,.24); color: var(--green); font-size: 1.3rem; font-weight: 900; }
+    .feature:nth-child(3n+2) .feature-icon { background: rgba(66,106,84,.12); }
+    .feature:nth-child(3n) .feature-icon { background: rgba(173,4,4,.09); color: var(--red); }
+    .feature h3 { margin: 17px 0 7px; font-size: 1.1rem; letter-spacing: -.025em; }
+    .feature p { margin: 0; color: var(--muted); font-size: .93rem; }
+    .workflow { background: #e9ebdf; }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; counter-reset: step; }
+    .step { position: relative; padding: 0 12px; counter-increment: step; }
+    .step-number { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--green); color: white; font-weight: 900; box-shadow: 5px 5px 0 var(--gold); }
+    .step h3 { margin: 20px 0 8px; font-size: 1.22rem; }
+    .step p { margin: 0; color: #626d61; }
+    .step:not(:last-child):after { content: "→"; position: absolute; right: -18px; top: 7px; color: var(--brown); font-size: 1.8rem; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 70px; }
+    .split-copy h2 { max-width: 510px; }
+    .split-copy p { color: var(--muted); }
+    .list { list-style: none; padding: 0; margin: 25px 0 0; display: grid; gap: 13px; }
+    .list li { display: flex; align-items: flex-start; gap: 11px; color: #4f5c50; }
+    .list b { color: var(--ink); }
+    .file-card { background: #fffefa; border: 1px solid var(--line); border-radius: 20px; padding: 28px; box-shadow: var(--shadow); transform: rotate(-1.5deg); }
+    .file-top { display: flex; justify-content: space-between; align-items: center; gap: 15px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+    .file-badge { background: rgba(237,193,58,.28); padding: 7px 10px; border-radius: 8px; font-size: .75rem; font-weight: 900; }
+    .file-name { font-weight: 850; letter-spacing: -.02em; }
+    .file-preview { margin: 22px 0; background: #eef0e8; border-radius: 12px; padding: 24px; }
+    .file-preview .bar { height: 8px; border-radius: 5px; background: #cdd4c8; margin: 9px 0; }
+    .file-preview .bar:nth-child(2) { width: 72%; }
+    .file-preview .bar:nth-child(3) { width: 84%; }
+    .file-preview .bar:nth-child(4) { width: 52%; }
+    .file-foot { color: var(--muted); font-size: .87rem; }
+    .cta { padding: 78px 0; }
+    .cta-panel {
+      text-align: center; padding: 66px 28px; border-radius: 26px; color: white;
+      background: var(--green); position: relative; overflow: hidden;
+    }
+    .cta-panel:before, .cta-panel:after { content: ""; position: absolute; border: 1px solid rgba(255,255,255,.13); border-radius: 50%; width: 330px; height: 330px; }
+    .cta-panel:before { left: -170px; top: -200px; }
+    .cta-panel:after { right: -150px; bottom: -220px; }
+    .cta-panel h2 { max-width: 650px; margin: 0 auto 14px; position: relative; }
+    .cta-panel p { max-width: 570px; margin: 0 auto 26px; color: rgba(255,255,255,.78); position: relative; }
+    .cta-panel .btn { position: relative; }
+    footer { padding: 28px 0 38px; border-top: 1px solid var(--line); color: #788075; font-size: .84rem; }
+    .footer-inner { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .footer-brand { color: var(--ink); font-weight: 900; }
+    @media (max-width: 900px) {
+      .hero-grid, .split { grid-template-columns: 1fr; gap: 48px; }
+      .hero { padding-top: 65px; }
+      .visual { width: min(650px, 100%); margin: 0 auto; }
+      .features { grid-template-columns: repeat(2, 1fr); }
+      .split { gap: 38px; }
+    }
+    @media (max-width: 620px) {
+      .wrap { width: min(100% - 32px, 1160px); }
+      nav { min-height: 66px; }
+      .navlinks { display: none; }
+      .nav-cta { padding: 10px 15px; font-size: .86rem; }
+      .hero { padding: 55px 0 60px; }
+      .hero-grid { gap: 38px; }
+      h1 { font-size: clamp(2.65rem, 13vw, 4rem); }
+      .hero-copy { font-size: 1rem; }
+      .editor { padding: 9px; }
+      .editor-body { min-height: 0; }
+      .canvas { padding: 16px 10px; }
+      .mock-window { height: 205px; width: 95%; }
+      .mock-content { padding: 15px; }
+      .float-tag { font-size: .68rem; padding: 8px 10px; }
+      .tag-one { left: -7px; }
+      .tag-two { right: -7px; }
+      section { padding: 68px 0; }
+      .features, .steps { grid-template-columns: 1fr; gap: 14px; }
+      .feature { min-height: 0; }
+      .step { padding: 8px 4px 18px; }
+      .step:not(:last-child):after { content: "↓"; right: 12px; top: 15px; }
+      .trust-inner { gap: 12px 20px; justify-content: flex-start; }
+      .cta { padding: 55px 0; }
+      .cta-panel { padding: 52px 22px; }
+    }
+  </style>
 </head>
-
 <body>
-
-<!-- ==================================================
-     TOOLBAR
-================================================== -->
-
-<div class="toolbar" role="toolbar" aria-label="Outils Fuze">
-
-    <div class="brand-mark">Fuze</div>
-
-    <details class="toolbar-menu" id="fileMenu">
-        <summary>File <span aria-hidden="true">▾</span></summary>
-        <div class="menu-panel">
-            <button type="button" data-action="open-image">Ouvrir une image <kbd>Ctrl+O</kbd></button>
-            <button type="button" data-action="open-fuze">Ouvrir Fuze / Open Fuze file <kbd>Ctrl+Shift+O</kbd></button>
-            <button type="button" data-action="save-fuze">Enregistrer Fuze / Save as Fuze file <kbd>Ctrl+Shift+S</kbd></button>
-            <div class="menu-separator"></div>
-            <button type="button" data-action="copy-png">Copier l’image annotée <kbd>Ctrl+Alt+C</kbd></button>
-            <button type="button" data-action="save-png">Enregistrer en PNG <kbd>Ctrl+S</kbd></button>
-            <div class="menu-separator"></div>
-            <button type="button" class="menu-danger" data-action="clear-panel">Clear panel <kbd>Ctrl+Alt+⌫</kbd></button>
-            <div class="menu-separator"></div>
-            <button type="button" id="openHelpButton">Aide</button>
+  <header class="topbar">
+    <div class="wrap">
+      <nav aria-label="Navigation principale">
+        <a class="brand" href="#accueil" aria-label="Fuze, accueil"><span class="brand-mark">F</span> fuze</a>
+        <div class="navlinks">
+          <a href="#fonctionnalites">Fonctionnalités</a>
+          <a href="#comment">Comment ça marche</a>
+          <a href="#projets">Vos projets</a>
         </div>
-    </details>
+        <!-- Remplacez #demarrer par l'URL réelle de votre application Fuze. -->
+        <a class="btn btn-dark nav-cta" href="Fuze.html">Essayer Fuze <span aria-hidden="true">↗</span></a>
+      </nav>
+    </div>
+  </header>
 
-    <details class="toolbar-menu" id="editMenu">
-        <summary>Edit <span aria-hidden="true">▾</span></summary>
-        <div class="menu-panel">
-            <button type="button" data-tool="select">Sélection <kbd>S</kbd></button>
-            <button type="button" data-tool="text">Texte <kbd>T</kbd></button>
-            <button type="button" data-tool="number">Numéro / Number <kbd>N</kbd></button>
-            <button type="button" data-tool="arrow">Flèche <kbd>A</kbd></button>
-            <button type="button" data-tool="simpleArrow">Flèche simple <kbd>Shift+A</kbd></button>
-            <div class="menu-separator"></div>
-            <button type="button" data-tool="rectangle">Rectangle <kbd>R</kbd></button>
-            <button type="button" data-tool="circle">Cercle <kbd>C</kbd></button>
-            <button type="button" data-tool="felt">Feutre <kbd>F</kbd></button>
-            <button type="button" data-tool="highlight">Highlight <kbd>H</kbd></button>
-            <button type="button" data-tool="blur">Blur <kbd>B</kbd></button>
-            <button type="button" data-tool="border">Bordure<kbd>O</kbd></button>
+  <main>
+    <section class="hero" id="accueil">
+      <div class="wrap hero-grid">
+        <div>
+          <div class="eyebrow">L’annotation visuelle, tout simplement</div>
+          <h1>Montrez ce que vous voulez dire. <span>Clairement.</span></h1>
+          <p class="hero-copy">Une image vaut mille mots. Avec Fuze, ajoutez des flèches, des formes, des textes et des repères directement sur vos images pour faire passer votre message sans ambiguïté.</p>
+          <div class="hero-actions">
+            <a class="btn btn-yellow" href="#demarrer">Découvrir Fuze <span aria-hidden="true">→</span></a>
+            <a class="btn btn-outline" href="#fonctionnalites">Voir les fonctionnalités</a>
+          </div>
+          <p class="micro">Un espace de travail visuel pour expliquer, commenter et guider.</p>
         </div>
-    </details>
 
-
-    <div class="toolbar-divider"></div>
-
-    <label class="control-group image-size-control" title="Taille appliquée aux images chargées ou collées">
-        <span class="toolbar-label">Image size</span>
-        <select id="imageResizeSelect" aria-label="Taille de l’image">
-            <option value="1" selected>100%</option>
-            <option value="0.9">90%</option>
-            <option value="0.8">80%</option>
-            <option value="0.7">70%</option>
-            <option value="0.6">60%</option>
-            <option value="0.5">50%</option>
-        </select>
-    </label>
-
-    <div class="toolbar-divider"></div>
-
-    <div class="control-group color-control">
-        <span class="toolbar-label">Color</span>
-        <div class="color-picker-wrap" id="colorPickerWrap">
-            <input type="color" id="colorInput" value="#4751e1" aria-label="Couleur du trait" title="Couleur du trait" aria-haspopup="dialog" aria-expanded="false" />
-            <div class="color-picker-popup" id="colorPickerPopup" role="dialog" aria-label="Choisir une couleur" hidden>
-                <div class="color-palette" id="colorPalette" aria-label="Couleurs prédéfinies">
-                    <button type="button" class="color-swatch" data-color="#e3342f" style="--swatch:#e3342f" aria-label="Rouge" title="Rouge"></button>
-                    <button type="button" class="color-swatch" data-color="#f6993f" style="--swatch:#f6993f" aria-label="Orange" title="Orange"></button>
-                    <button type="button" class="color-swatch" data-color="#ffed4a" style="--swatch:#ffed4a" aria-label="Jaune" title="Jaune"></button>
-                    <button type="button" class="color-swatch" data-color="#38c172" style="--swatch:#38c172" aria-label="Vert" title="Vert"></button>
-                    <button type="button" class="color-swatch" data-color="#4dc0b5" style="--swatch:#4dc0b5" aria-label="Turquoise" title="Turquoise"></button>
-                    <button type="button" class="color-swatch" data-color="#3490dc" style="--swatch:#3490dc" aria-label="Bleu" title="Bleu"></button>
-                    <button type="button" class="color-swatch" data-color="#6574cd" style="--swatch:#6574cd" aria-label="Indigo" title="Indigo"></button>
-                    <button type="button" class="color-swatch" data-color="#9561e2" style="--swatch:#9561e2" aria-label="Violet" title="Violet"></button>
-                    <button type="button" class="color-swatch" data-color="#f66d9b" style="--swatch:#f66d9b" aria-label="Rose" title="Rose"></button>
-                    <button type="button" class="color-swatch" data-color="#000000" style="--swatch:#000000" aria-label="Noir" title="Noir"></button>
-                    <button type="button" class="color-swatch" data-color="#808080" style="--swatch:#808080" aria-label="Gris" title="Gris"></button>
-                    <button type="button" class="color-swatch" data-color="#c0c0c0" style="--swatch:#c0c0c0" aria-label="Gris clair" title="Gris clair"></button>
-                </div>
-                <label class="custom-color-label" for="customColorInput">Couleur personnalisée</label>
-                <input type="color" id="customColorInput" value="#4751e1" aria-label="Couleur personnalisée" />
+        <div class="visual" aria-label="Aperçu illustratif d'une image annotée dans Fuze">
+          <div class="float-tag tag-one">✦ Vos idées, en évidence</div>
+          <div class="editor">
+            <div class="editor-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="editor-name">Fuze · Espace d’annotation</span></div>
+            <div class="editor-body">
+              <img class="demo-screen" src="Fuze - Fake screen demo.png" alt="Capture d’écran de démonstration de Fuze">
             </div>
-        </div>        
-        <button id="eyedropperButton" type="button" title="Prélever une couleur sur le canvas (Échap pour annuler)" aria-label="Pipette">
-            <img src="pipette.png" alt="" width="20" height="20" style="object-fit:contain;display:block;pointer-events:none">
-        </button>
-    </div>
-
-    <div class="toolbar-divider"></div>
-
-    <label class="control-group compact-control" title="Épaisseur du trait">
-        <span class="toolbar-label">Thickness</span>
-        <input type="number" id="strokeWidthInput" min="1" max="30" value="6" aria-label="Épaisseur" />
-    </label>
-
-    <div class="toolbar-divider"></div>
-
-    <label class="control-group transparency-control" title="Transparence du surlignage">
-        <span class="toolbar-label">Transparency</span>
-        <input type="range" id="strokeOpacityInput" min="10" max="100" value="100" step="5" aria-label="Transparence" />
-        <output id="strokeOpacityValue" for="strokeOpacityInput">100%</output>
-    </label>
-
-    <div class="toolbar-divider"></div>
-
-    <label class="control-group compact-control" title="Taille du texte">
-        <span class="toolbar-label">Text size</span>
-        <input type="number" id="fontSizeInput" min="8" max="120" value="32" aria-label="Taille du texte" />
-    </label>
-
-    <div class="toolbar-divider"></div>
-
-    <label class="control-group zoom-control" title="Niveau de zoom">
-        <span class="toolbar-label">Zoom</span>
-        <select id="zoomSelect" aria-label="Zoom">
-            <option value="0.5">50%</option>
-            <option value="0.75">75%</option>
-            <option value="1" selected>100%</option>
-            <option value="1.25">125%</option>
-            <option value="1.5">150%</option>
-            <option value="2">200%</option>
-        </select>
-    </label>
-
-    <input type="file" id="imageInput" accept="image/*" multiple hidden>
-    <input type="file" id="fuzeFileInput" accept=".fuze,application/json" hidden>
-
-    <!-- Commandes invisibles conservées pour réutiliser les actions existantes. -->
-    <div hidden aria-hidden="true">
-        <button id="addImageButton" type="button"></button>
-        <button id="undoButton" type="button"></button>
-        <button id="redoButton" type="button"></button>
-        <button id="deleteButton" type="button"></button>
-        <button id="zoomInButton" type="button"></button>
-        <button id="zoomOutButton" type="button"></button>
-        <button id="copyPngButton" type="button"></button>
-        <button id="downloadPngButton" type="button"></button>
-        <button id="clearButton" type="button"></button>
-    </div>
-</div>
-
-<!-- ==================================================
-     WORKSPACE
-================================================== -->
-
-<div class="workspace" id="workspace">
-
-    <div class="workspace-content">
-        <div class="stage" id="stage">
-
-            <canvas
-                id="canvas"
-                width="1200"
-                height="750"
-            ></canvas>
-
-            <div id="arrow-handles-layer">
-
-                <div
-                    id="arrowHandleStart"
-                    class="arrow-handle"
-                    title="Début de la flèche"
-                ></div>
-
-                <div
-                    id="arrowHandleEnd"
-                    class="arrow-handle"
-                    title="Pointe de la flèche"
-                ></div>
-
-            </div>
-
-            <div
-                id="emptyMessage"
-                class="empty-message"
-            >
-                Ajoutez une image pour commencer
-            </div>
-
+          </div>
+          <div class="float-tag tag-two">✓ Un retour précis, tout de suite</div>
         </div>
-    </div>
-
-</div>
-
-<!-- ==================================================
-     HELP MODAL
-================================================== -->
-<div class="help-modal-backdrop" id="helpModal" hidden>
-    <section class="help-modal" role="dialog" aria-modal="true"
-             aria-labelledby="helpModalTitle">
-        <header class="help-modal-header">
-            <h2 id="helpModalTitle">Fuze Help</h2>
-            <button type="button" class="help-modal-close" id="closeHelpButton"
-                    aria-label="Close help" title="Close">×</button>
-        </header>
-        <iframe id="helpFrame" title="Fuze help and features" src="about:blank"></iframe>
+      </div>
     </section>
-</div>
 
-<!-- ==================================================
-     STATUS
-================================================== -->
+    <div class="trust-strip">
+      <div class="wrap trust-inner">
+        <span><b class="check">✓</b> Flèches et formes</span>
+        <span><b class="check">✓</b> Texte et numérotation</span>
+        <span><b class="check">✓</b> Surlignage et flou</span>
+        <span><b class="check">✓</b> Projets éditables .fuze</span>
+      </div>
+    </div>
 
-<div class="statusbar">
+    <section id="fonctionnalites">
+      <div class="wrap">
+        <div class="section-head">
+          <div class="kicker">Tout ce qu’il faut pour être compris</div>
+          <h2>Vos annotations. Votre façon d’expliquer.</h2>
+          <p>Fuze rassemble les outils essentiels pour attirer l’attention, détailler un point et transformer une simple capture en explication visuelle.</p>
+        </div>
+        <div class="features">
+          <article class="feature">
+            <div class="feature-icon">➜</div>
+            <h3>Flèches qui guident</h3>
+            <p>Dirigez le regard vers le bon endroit avec des flèches classiques ou des Smart Arrows.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon">▢</div>
+            <h3>Formes pour encadrer</h3>
+            <p>Utilisez rectangles et cercles pour isoler une zone ou mettre un détail en évidence.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon">T</div>
+            <h3>Textes et numéros</h3>
+            <p>Ajoutez une consigne, une précision ou une suite d’étapes numérotées.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon">✎</div>
+            <h3>Dessin libre</h3>
+            <p>Tracez à main levée pour entourer, souligner ou illustrer rapidement votre idée.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon">▰</div>
+            <h3>Mettre en lumière</h3>
+            <p>Attirez l’œil avec le surlignage et ajustez l’apparence de vos annotations.</p>
+          </article>
+          <article class="feature">
+            <div class="feature-icon">◉</div>
+            <h3>Flouter une zone</h3>
+            <p>Masquez les informations qui ne doivent pas apparaître dans votre visuel.</p>
+          </article>
+        </div>
+      </div>
+    </section>
 
-    <span id="statusText">
-        Prêt
-    </span>
+    <section class="workflow" id="comment">
+      <div class="wrap">
+        <div class="section-head">
+          <div class="kicker">Simple comme bonjour</div>
+          <h2>De l’image au message, en trois étapes.</h2>
+          <p>Pas besoin de longs commentaires : placez vos annotations là où elles sont utiles.</p>
+        </div>
+        <div class="steps">
+          <article class="step">
+            <div class="step-number">01</div>
+            <h3>Ajoutez votre image</h3>
+            <p>Collez une image dans votre espace de travail pour commencer à la commenter.</p>
+          </article>
+          <article class="step">
+            <div class="step-number">02</div>
+            <h3>Annotez à votre rythme</h3>
+            <p>Choisissez un outil, ajoutez vos repères et ajustez couleurs, épaisseur ou transparence.</p>
+          </article>
+          <article class="step">
+            <div class="step-number">03</div>
+            <h3>Enregistrez votre travail</h3>
+            <p>Conservez votre composition dans un fichier Fuze éditable pour la retrouver et la modifier plus tard.</p>
+          </article>
+        </div>
+      </div>
+    </section>
 
-    <nav class="statusbar-links" aria-label="Liens utiles">
-        <a href="confidentialite.html">Confidentialité</a>
-        <a href="tarifs.html">Tarifs</a>
-        <a href="fuze-documentation.html">Aide</a>
-        <a href="contact.html">Nous contacter</a>
-    </nav>
+    <section id="projets">
+      <div class="wrap split">
+        <div class="split-copy">
+          <div class="kicker">Gardez la main sur vos créations</div>
+          <h2>Reprenez votre travail là où vous l’avez laissé.</h2>
+          <p>Une annotation n’est pas toujours définitive. Avec le format de projet <b>.fuze</b>, vous pouvez sauvegarder le contenu de votre canvas et le rouvrir pour continuer à travailler dessus.</p>
+          <ul class="list">
+            <li><span class="check">✓</span><span><b>Un projet rééditable :</b> retrouvez vos éléments et modifiez-les.</span></li>
+            <li><span class="check">✓</span><span><b>Une sélection intuitive :</b> cliquez sur un objet pour le sélectionner et ajuster ses propriétés.</span></li>
+            <li><span class="check">✓</span><span><b>Des raccourcis clavier :</b> accédez rapidement aux outils et aux fonctions avancées.</span></li>
+            <li><span class="check">✓</span><span><b>Une sélection multiple :</b> ajustez plusieurs annotations en une seule opération.</span></li>
+          </ul>
+        </div>
+        <div class="file-card" aria-label="Illustration d'un fichier projet Fuze">
+          <div class="file-top">
+            <div><div class="file-name">Mon annotation</div><div class="file-foot">Projet modifiable</div></div>
+            <span class="file-badge">.FUZE</span>
+          </div>
+          <div class="file-preview">
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          </div>
+          <div class="file-foot">Votre canvas et ses annotations réunis dans un seul fichier projet.</div>
+        </div>
+      </div>
+    </section>
 
-    <span id="zoomStatus">
-        100%
-    </span>
+    <section class="cta" id="demarrer">
+      <div class="wrap">
+        <div class="cta-panel">
+          <div class="kicker" style="color:var(--gold)">Prêt à passer à l’essentiel ?</div>
+          <h2>Une image. Quelques annotations. Et tout devient plus clair.</h2>
+          <p>Essayez une autre façon de partager vos idées : plus visuelle, plus directe et plus facile à comprendre.</p>
+          <!-- Remplacez #accueil par l'URL réelle de l'application Fuze avant publication. -->
+          <a class="btn btn-yellow" href="Fuze.html">Ouvrir Fuze <span aria-hidden="true">↗</span></a>
+        </div>
+      </div>
+    </section>
+  </main>
 
-</div>
-
+  <footer>
+    <div class="wrap footer-inner">
+      <a class="brand footer-brand" href="#accueil"><span class="brand-mark">F</span> fuze</a>
+      <span>Fuze — Faites passer vos idées clairement.</span>
+      <a href="#accueil">Retour en haut ↑</a>
+    </div>
+  </footer>
 </body>
 </html>

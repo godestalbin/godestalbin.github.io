@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<!-- Analytics and advertising are loaded only on a hosted site.
+     This avoids waiting for third-party requests when testing via file:// locally. -->
+<script>
+    if (location.protocol !== "file:") {
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-KCKN5KPES3');
+
+        const gaScript = document.createElement('script');
+        gaScript.async = true;
+        gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-KCKN5KPES3';
+        document.head.appendChild(gaScript);
+
+        const adsScript = document.createElement('script');
+        adsScript.async = true;
+        adsScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6392049906379676';
+        adsScript.crossOrigin = 'anonymous';
+        document.head.appendChild(adsScript);
+    }
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Fuze – Free Online Image Annotation Tool</title>
+<meta name="description"
+      content="Annotate images and screenshots online for free.
+      Add arrows, text, shapes, highlights and blur sensitive details.
+      Export your images as PNG or copy it in the clipboard.">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/fabric@6.9.0/dist/index.min.js" defer></script>
+<script src="js/analytics.js" defer></script>
+<script src="js/i18n.js" defer></script>
+<script src="js/state.js" defer></script>
+<script src="js/canvas.js" defer></script>
+<script src="js/tools.js" defer></script>
+<script src="js/blur.js" defer></script>
+<script src="js/history.js" defer></script>
+<script src="js/files.js" defer></script>
+<script src="js/fuze.js" defer></script>
+<script src="js/menu.js" defer></script>
+<script src="js/ui.js" defer></script>
+<script src="js/shortcuts.js" defer></script>
+<script src="js/main.js" defer></script>
+<script src="js/help.js" defer></script>
+
+</head>
+
+<body>
+
+<!-- ==================================================
+     TOOLBAR
+================================================== -->
+
+<div class="toolbar" role="toolbar" aria-label="Outils Fuze">
+
+    <div class="brand-mark">Fuze</div>
+
+    <details class="toolbar-menu" id="fileMenu">
+        <summary>File <span aria-hidden="true">▾</span></summary>
+        <div class="menu-panel">
+            <button type="button" data-action="open-image">Ouvrir une image <kbd>Ctrl+O</kbd></button>
+            <button type="button" data-action="open-fuze">Ouvrir Fuze / Open Fuze file <kbd>Ctrl+Shift+O</kbd></button>
+            <button type="button" data-action="save-fuze">Enregistrer Fuze / Save as Fuze file <kbd>Ctrl+Shift+S</kbd></button>
+            <div class="menu-separator"></div>
+            <button type="button" data-action="copy-png">Copier l’image annotée <kbd>Ctrl+Alt+C</kbd></button>
+            <button type="button" data-action="save-png">Enregistrer en PNG <kbd>Ctrl+S</kbd></button>
+            <div class="menu-separator"></div>
+            <button type="button" class="menu-danger" data-action="clear-panel">Clear panel <kbd>Ctrl+Alt+⌫</kbd></button>
+            <div class="menu-separator"></div>
+            <button type="button" id="openHelpButton">Aide</button>
+        </div>
+    </details>
+
+    <details class="toolbar-menu" id="editMenu">
+        <summary>Edit <span aria-hidden="true">▾</span></summary>
+        <div class="menu-panel">
+            <button type="button" data-tool="select">Sélection <kbd>S</kbd></button>
+            <button type="button" data-tool="text">Texte <kbd>T</kbd></button>
+            <button type="button" data-tool="number">Numéro / Number <kbd>N</kbd></button>
+            <button type="button" data-tool="arrow">Flèche <kbd>A</kbd></button>
+            <button type="button" data-tool="simpleArrow">Flèche simple <kbd>Shift+A</kbd></button>
+            <div class="menu-separator"></div>
+            <button type="button" data-tool="rectangle">Rectangle <kbd>R</kbd></button>
+            <button type="button" data-tool="circle">Cercle <kbd>C</kbd></button>
+            <button type="button" data-tool="felt">Feutre <kbd>F</kbd></button>
+            <button type="button" data-tool="highlight">Highlight <kbd>H</kbd></button>
+            <button type="button" data-tool="blur">Blur <kbd>B</kbd></button>
+            <button type="button" data-tool="border">Bordure<kbd>O</kbd></button>
+        </div>
+    </details>
+
+
+    <div class="toolbar-divider"></div>
+
+    <label class="control-group image-size-control" title="Taille appliquée aux images chargées ou collées">
+        <span class="toolbar-label">Image size</span>
+        <select id="imageResizeSelect" aria-label="Taille de l’image">
+            <option value="1" selected>100%</option>
+            <option value="0.9">90%</option>
+            <option value="0.8">80%</option>
+            <option value="0.7">70%</option>
+            <option value="0.6">60%</option>
+            <option value="0.5">50%</option>
+        </select>
+    </label>
+
+    <div class="toolbar-divider"></div>
+
+    <div class="control-group color-control">
+        <span class="toolbar-label">Color</span>
+        <div class="color-picker-wrap" id="colorPickerWrap">
+            <input type="color" id="colorInput" value="#4751e1" aria-label="Couleur du trait" title="Couleur du trait" aria-haspopup="dialog" aria-expanded="false" />
+            <div class="color-picker-popup" id="colorPickerPopup" role="dialog" aria-label="Choisir une couleur" hidden>
+                <div class="color-palette" id="colorPalette" aria-label="Couleurs prédéfinies">
+                    <button type="button" class="color-swatch" data-color="#e3342f" style="--swatch:#e3342f" aria-label="Rouge" title="Rouge"></button>
+                    <button type="button" class="color-swatch" data-color="#f6993f" style="--swatch:#f6993f" aria-label="Orange" title="Orange"></button>
+                    <button type="button" class="color-swatch" data-color="#ffed4a" style="--swatch:#ffed4a" aria-label="Jaune" title="Jaune"></button>
+                    <button type="button" class="color-swatch" data-color="#38c172" style="--swatch:#38c172" aria-label="Vert" title="Vert"></button>
+                    <button type="button" class="color-swatch" data-color="#4dc0b5" style="--swatch:#4dc0b5" aria-label="Turquoise" title="Turquoise"></button>
+                    <button type="button" class="color-swatch" data-color="#3490dc" style="--swatch:#3490dc" aria-label="Bleu" title="Bleu"></button>
+                    <button type="button" class="color-swatch" data-color="#6574cd" style="--swatch:#6574cd" aria-label="Indigo" title="Indigo"></button>
+                    <button type="button" class="color-swatch" data-color="#9561e2" style="--swatch:#9561e2" aria-label="Violet" title="Violet"></button>
+                    <button type="button" class="color-swatch" data-color="#f66d9b" style="--swatch:#f66d9b" aria-label="Rose" title="Rose"></button>
+                    <button type="button" class="color-swatch" data-color="#000000" style="--swatch:#000000" aria-label="Noir" title="Noir"></button>
+                    <button type="button" class="color-swatch" data-color="#808080" style="--swatch:#808080" aria-label="Gris" title="Gris"></button>
+                    <button type="button" class="color-swatch" data-color="#c0c0c0" style="--swatch:#c0c0c0" aria-label="Gris clair" title="Gris clair"></button>
+                </div>
+                <label class="custom-color-label" for="customColorInput">Couleur personnalisée</label>
+                <input type="color" id="customColorInput" value="#4751e1" aria-label="Couleur personnalisée" />
+            </div>
+        </div>        
+        <button id="eyedropperButton" type="button" title="Prélever une couleur sur le canvas (Échap pour annuler)" aria-label="Pipette">
+            <img src="pipette.png" alt="" width="20" height="20" style="object-fit:contain;display:block;pointer-events:none">
+        </button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <label class="control-group compact-control" title="Épaisseur du trait">
+        <span class="toolbar-label">Thickness</span>
+        <input type="number" id="strokeWidthInput" min="1" max="30" value="6" aria-label="Épaisseur" />
+    </label>
+
+    <div class="toolbar-divider"></div>
+
+    <label class="control-group transparency-control" title="Transparence du surlignage">
+        <span class="toolbar-label">Transparency</span>
+        <input type="range" id="strokeOpacityInput" min="10" max="100" value="100" step="5" aria-label="Transparence" />
+        <output id="strokeOpacityValue" for="strokeOpacityInput">100%</output>
+    </label>
+
+    <div class="toolbar-divider"></div>
+
+    <label class="control-group compact-control" title="Taille du texte">
+        <span class="toolbar-label">Text size</span>
+        <input type="number" id="fontSizeInput" min="8" max="120" value="32" aria-label="Taille du texte" />
+    </label>
+
+    <div class="toolbar-divider"></div>
+
+    <label class="control-group zoom-control" title="Niveau de zoom">
+        <span class="toolbar-label">Zoom</span>
+        <select id="zoomSelect" aria-label="Zoom">
+            <option value="0.5">50%</option>
+            <option value="0.75">75%</option>
+            <option value="1" selected>100%</option>
+            <option value="1.25">125%</option>
+            <option value="1.5">150%</option>
+            <option value="2">200%</option>
+        </select>
+    </label>
+
+    <input type="file" id="imageInput" accept="image/*" multiple hidden>
+    <input type="file" id="fuzeFileInput" accept=".fuze,application/json" hidden>
+
+    <!-- Commandes invisibles conservées pour réutiliser les actions existantes. -->
+    <div hidden aria-hidden="true">
+        <button id="addImageButton" type="button"></button>
+        <button id="undoButton" type="button"></button>
+        <button id="redoButton" type="button"></button>
+        <button id="deleteButton" type="button"></button>
+        <button id="zoomInButton" type="button"></button>
+        <button id="zoomOutButton" type="button"></button>
+        <button id="copyPngButton" type="button"></button>
+        <button id="downloadPngButton" type="button"></button>
+        <button id="clearButton" type="button"></button>
+    </div>
+</div>
+
+<!-- ==================================================
+     WORKSPACE
+================================================== -->
+
+<div class="workspace" id="workspace">
+
+    <div class="workspace-content">
+        <div class="stage" id="stage">
+
+            <canvas
+                id="canvas"
+                width="1200"
+                height="750"
+            ></canvas>
+
+            <div id="arrow-handles-layer">
+
+                <div
+                    id="arrowHandleStart"
+                    class="arrow-handle"
+                    title="Début de la flèche"
+                ></div>
+
+                <div
+                    id="arrowHandleEnd"
+                    class="arrow-handle"
+                    title="Pointe de la flèche"
+                ></div>
+
+            </div>
+
+            <div
+                id="emptyMessage"
+                class="empty-message"
+            >
+                Ajoutez une image pour commencer
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<!-- ==================================================
+     HELP MODAL
+================================================== -->
+<div class="help-modal-backdrop" id="helpModal" hidden>
+    <section class="help-modal" role="dialog" aria-modal="true"
+             aria-labelledby="helpModalTitle">
+        <header class="help-modal-header">
+            <h2 id="helpModalTitle">Fuze Help</h2>
+            <button type="button" class="help-modal-close" id="closeHelpButton"
+                    aria-label="Close help" title="Close">×</button>
+        </header>
+        <iframe id="helpFrame" title="Fuze help and features" src="about:blank"></iframe>
+    </section>
+</div>
+
+<!-- ==================================================
+     STATUS
+================================================== -->
+
+<div class="statusbar">
+
+    <span id="statusText">
+        Prêt
+    </span>
+
+    <nav class="statusbar-links" aria-label="Liens utiles">
+        <a href="confidentialite.html">Confidentialité</a>
+        <a href="tarifs.html">Tarifs</a>
+        <a href="fuze-documentation.html">Aide</a>
+        <a href="contact.html">Nous contacter</a>
+    </nav>
+
+    <span id="zoomStatus">
+        100%
+    </span>
+
+</div>
+
+</body>
+</html>
