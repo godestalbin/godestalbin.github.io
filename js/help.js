@@ -31,6 +31,29 @@
     openButton.addEventListener("click", openHelp);
     closeButton.addEventListener("click", closeHelp);
 
+    // ? (Shift+/) ouvre l'aide depuis n'importe quel outil.
+    // Ne pas intercepter la frappe dans les champs de saisie ou l'édition de texte.
+    document.addEventListener("keydown", event => {
+        const target = event.target;
+        const isFormField =
+            target instanceof HTMLInputElement ||
+            target instanceof HTMLTextAreaElement ||
+            target instanceof HTMLSelectElement ||
+            target.isContentEditable;
+
+        if (
+            event.key === "?" &&
+            !event.ctrlKey &&
+            !event.altKey &&
+            !event.metaKey &&
+            !isFormField &&
+            modal.hidden
+        ) {
+            event.preventDefault();
+            openHelp();
+        }
+    });
+
     modal.addEventListener("click", event => {
         if (event.target === modal) closeHelp();
     });
