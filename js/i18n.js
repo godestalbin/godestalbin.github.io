@@ -60,7 +60,11 @@ function applyFuzeLanguage() {
     setSummary("#fileMenu > summary", "file");
     setSummary("#editMenu > summary", "edit");
     const helpButton = document.getElementById("openHelpButton");
-    if (helpButton) helpButton.textContent = fuzeT("help");
+    if (helpButton) {
+        // Ne pas utiliser textContent sur le bouton : cela supprimerait le <kbd>?</kbd>.
+        const helpText = Array.from(helpButton.childNodes).find(n => n.nodeType === Node.TEXT_NODE);
+        if (helpText) helpText.textContent = fuzeT("help") + " ";
+    }
     const menuLabels = [
         ['[data-action="open-image"]', 'openImage'],
         ['[data-action="open-fuze"]', 'openFuze'],

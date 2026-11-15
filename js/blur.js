@@ -323,7 +323,10 @@ function createBlurObject(
                 evented: true,
 
                 hasControls: true,
-                hasBorders: true,
+                hasBorders: false,
+                stroke: null,
+                strokeWidth: 0,
+                lockUniScaling: false,
 
                 blurType: "blur",
                 blurRadius: radius
@@ -375,6 +378,9 @@ function refreshBlurObject(object) {
         return null;
     }
 
+
+    // Le blur ne doit jamais afficher de contour de sélection Fabric.
+    object.set({ hasBorders: false });
 
     blurUpdateInProgress = true;
 
@@ -438,7 +444,10 @@ function refreshBlurObject(object) {
                 evented: true,
 
                 hasControls: true,
-                hasBorders: true,
+                hasBorders: false,
+                stroke: null,
+                strokeWidth: 0,
+                lockUniScaling: false,
 
                 blurType: "blur",
                 blurRadius:

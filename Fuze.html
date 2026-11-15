@@ -58,7 +58,7 @@
 
 <div class="toolbar" role="toolbar" aria-label="Outils Fuze">
 
-    <div class="brand-mark">Fuze</div>
+    <a class="brand" href="https://godestalbin.github.io/" aria-label="Fuze, accueil"><span class="brand-mark">F</span><span class="brand-word">fuze</span></a>
 
     <details class="toolbar-menu" id="fileMenu">
         <summary>File <span aria-hidden="true">▾</span></summary>
@@ -72,7 +72,7 @@
             <div class="menu-separator"></div>
             <button type="button" class="menu-danger" data-action="clear-panel">Clear panel <kbd>Ctrl+Alt+⌫</kbd></button>
             <div class="menu-separator"></div>
-            <button type="button" id="openHelpButton">Aide</button>
+            <button type="button" id="openHelpButton">Aide <kbd>?</kbd></button>
         </div>
     </details>
 
@@ -82,6 +82,7 @@
             <button type="button" data-tool="select">Sélection <kbd>S</kbd></button>
             <button type="button" data-tool="text">Texte <kbd>T</kbd></button>
             <button type="button" data-tool="number">Numéro / Number <kbd>N</kbd></button>
+            <button type="button" data-tool="stamp">Tampon / Stamp <kbd>Shift+T</kbd></button>
             <button type="button" data-tool="arrow">Flèche <kbd>A</kbd></button>
             <button type="button" data-tool="simpleArrow">Flèche simple <kbd>Shift+A</kbd></button>
             <div class="menu-separator"></div>
@@ -100,6 +101,11 @@
     <label class="control-group image-size-control" title="Taille appliquée aux images chargées ou collées">
         <span class="toolbar-label">Image size</span>
         <select id="imageResizeSelect" aria-label="Taille de l’image">
+            <option value="1.5">150%</option>
+            <option value="1.4">140%</option>
+            <option value="1.3">130%</option>
+            <option value="1.2">120%</option>
+            <option value="1.1">110%</option>
             <option value="1" selected>100%</option>
             <option value="0.9">90%</option>
             <option value="0.8">80%</option>
@@ -233,6 +239,27 @@
         </div>
     </div>
 
+</div>
+
+<!-- ==================================================
+     STAMP TEXT MODAL
+================================================== -->
+<div class="stamp-modal-backdrop" id="stampModal" hidden>
+    <section class="stamp-modal" role="dialog" aria-modal="true" aria-labelledby="stampModalTitle">
+        <header class="stamp-modal-header">
+            <h2 id="stampModalTitle">Tampon / Stamp</h2>
+            <button type="button" class="help-modal-close" id="closeStampButton" aria-label="Fermer" title="Fermer">×</button>
+        </header>
+        <form id="stampForm" class="stamp-modal-form">
+            <label for="stampTextInput">Texte du tampon</label>
+            <textarea id="stampTextInput" rows="3" maxlength="120" placeholder="Votre texte" required></textarea>
+            <p>Les retours à la ligne sont conservés. Le texte sera affiché en majuscules.</p>
+            <div class="stamp-modal-actions">
+                <button type="button" id="cancelStampButton" class="stamp-cancel-button">Annuler</button>
+                <button type="submit" class="stamp-confirm-button">Créer le tampon</button>
+            </div>
+        </form>
+    </section>
 </div>
 
 <!-- ==================================================

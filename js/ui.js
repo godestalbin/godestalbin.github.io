@@ -146,6 +146,15 @@ function syncControlsFromSelectedObject() {
     strokeOpacityInput.value = String(Math.max(10, Math.min(100, Math.round(opacity * 100))));
     updateStrokeOpacityLabel();
 
+    if (object.fuzeTool === "stamp") {
+        if (object.stampColor) colorInput.value = object.stampColor;
+        if (Number.isFinite(object.stampFontSize)) fontSizeInput.value = String(object.stampFontSize);
+        if (Number.isFinite(object.stampStrokeWidth)) strokeWidthInput.value = String(object.stampStrokeWidth);
+        strokeOpacityInput.value = String(Math.max(10, Math.min(100, Math.round((object.opacity ?? 1) * 100))));
+        updateStrokeOpacityLabel();
+        return;
+    }
+
     if (object.fuzeTool === "number") {
         const parts = object.getObjects();
         const circle = parts.find(item => item.type === "circle");
@@ -388,7 +397,17 @@ function updateSelectedObject(source = null) {
                 const properties = {};
                 if (colorWasEdited) properties.fill = newColor;
                 if (opacityWasEdited) properties.opacity = newOpacity;
-                if (fontSizeWasEdited) properties.fontSize = newFontSize;
+                if (fontSizeWasEdited) {
+                    properties.fontSize = newFontSize;
+                    // Conserver un contour blanc et un halo proportionnels à la taille.
+                    properties.strokeWidth = Math.max(2, newFontSize * 0.25);
+                    properties.shadow = new fabric.Shadow({
+                        color: "rgba(99, 99, 99, 0.85)",
+                        blur: Math.max(3, newFontSize * 0.3125),
+                        offsetX: 0,
+                        offsetY: 0
+                    });
+                }
                 item.set(properties);
                 item.setCoords();
                 return;
@@ -418,9 +437,10 @@ function updateSelectedObject(source = null) {
             if (["rect", "ellipse", "path"].includes(item.type)) {
                 const properties = {};
                 if (colorWasEdited) {
-                    properties.stroke = item.fuzeTool === "highlight"
-                        ? "rgba(255,210,30,0.85)"
-                        : newColor;
+                    properties.stroke = newColor;
+                    if (item.fuzeTool === "highlight") {
+                        properties.fill = getHighlightFillColor(newColor, 0.30);
+                    }
                 }
                 if (opacityWasEdited) properties.opacity = newOpacity;
                 if (widthWasEdited) properties.strokeWidth = newWidth;
@@ -436,6 +456,22 @@ function updateSelectedObject(source = null) {
         canvas.requestRenderAll();
         saveHistory();
         updateStatus("Style appliqué aux objets sélectionnés");
+        return;
+    }
+
+    /* -------------------------------------------------
+       TAMPON / STAMP
+    ------------------------------------------------- */
+
+    if (object.fuzeTool === "stamp") {
+        const changes = {};
+        if (source === "color") changes.color = getColor();
+        if (source === "strokeWidth") changes.strokeWidth = getStrokeWidth();
+        if (source === "opacity") changes.opacity = getStrokeOpacity();
+        if (source === "fontSize") changes.fontSize = getFontSize();
+        if (Object.keys(changes).length) {
+            updateStampObject(object, changes).then(() => updateStatus("Tampon modifié"));
+        }
         return;
     }
 
@@ -607,9 +643,16 @@ function updateSelectedObject(source = null) {
             fontSizeInput
         ) {
 
+            const newFontSize = getFontSize();
             object.set({
-                fontSize:
-                    getFontSize()
+                fontSize: newFontSize,
+                strokeWidth: Math.max(2, newFontSize * 0.25),
+                shadow: new fabric.Shadow({
+                    color: "rgba(99, 99, 99, 0.85)",
+                    blur: Math.max(3, newFontSize * 0.3125),
+                    offsetX: 0,
+                    offsetY: 0
+                })
             });
         }
 
@@ -654,15 +697,17 @@ function updateSelectedObject(source = null) {
         object.type === "path"
     ) {
 
-        object.set({
-
-            stroke:
-                getColor(),
-
+        const selectedColor = getColor();
+        const shapeStyle = {
+            stroke: selectedColor,
             strokeWidth: getStrokeWidth(),
-
-            opacity: getStrokeOpacity()
-        });
+            opacity: getStrokeOpacity(),
+            strokeUniform: true
+        };
+        if (object.fuzeTool === "highlight") {
+            shapeStyle.fill = getHighlightFillColor(selectedColor, 0.30);
+        }
+        object.set(shapeStyle);
 
 
         canvas.requestRenderAll();

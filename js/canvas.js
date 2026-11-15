@@ -9,7 +9,8 @@ const canvas =
         canvasElement,
         {
             selection: true,
-            preserveObjectStacking: true
+            preserveObjectStacking: true,
+            uniformScaling: false
         }
     );
 

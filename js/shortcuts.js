@@ -322,6 +322,9 @@ async function copySelectedObjects() {
 async function pasteCopiedObjects() {
     if (!fuzeObjectClipboard?.length) return;
 
+    // Un collage crée une sélection éditable : quitter d'abord l'outil actif.
+    setTool("select");
+
     try {
         const pasted = await Promise.all(
             fuzeObjectClipboard.map(object =>
@@ -675,6 +678,14 @@ document.addEventListener("keydown", event => {
     if (!event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && key === "o") {
         event.preventDefault();
         addBorderToSelectedImage();
+        document.querySelectorAll(".toolbar-menu").forEach(menu => menu.removeAttribute("open"));
+        return;
+    }
+
+    // Tampon : Shift+T.
+    if (!event.ctrlKey && !event.altKey && !event.metaKey && event.shiftKey && key === "t") {
+        event.preventDefault();
+        setTool("stamp");
         document.querySelectorAll(".toolbar-menu").forEach(menu => menu.removeAttribute("open"));
         return;
     }

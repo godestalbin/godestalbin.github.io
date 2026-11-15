@@ -1,9 +1,15 @@
     :root {
-        --paper: #f5f0e6;
-        --clay: #a86f4d;
-        --pine: #596b4a;
-        --dark: #30352f;
-        --border: #d6cec0;
+        --fuze-yellow: #edc13a;
+        --fuze-sand: #e0c477;
+        --fuze-red: #ad0404;
+        --fuze-brown: #8b6948;
+        --fuze-sage: #b9b99f;
+        --fuze-green: #426a54;
+        --paper: #fbf8ef;
+        --clay: var(--fuze-brown);
+        --pine: var(--fuze-green);
+        --dark: #30291f;
+        --border: var(--fuze-sage);
     }
 
     * {
@@ -42,20 +48,44 @@
         flex-wrap: nowrap;
         white-space: nowrap;
         overflow: visible;
-        background: #fff;
-        border-bottom: 1px solid var(--border);
+        background: #fffdf7;
+        border-bottom: 2px solid var(--fuze-yellow);
         box-shadow: 0 1px 5px rgba(0,0,0,.08);
         z-index: 30;
         scrollbar-width: thin;
     }
 
+    .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex: 0 0 auto;
+        color: var(--dark);
+        text-decoration: none;
+        font-size: 1.22rem;
+        font-weight: 850;
+        letter-spacing: -.06em;
+        line-height: 1;
+        padding: 0 4px;
+    }
+
     .brand-mark {
-        font-size: 17px;
-        font-weight: 700;
-        letter-spacing: -.4px;
-        padding: 0 3px;
+        width: 31px;
+        height: 31px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        color: var(--dark);
+        background: var(--fuze-yellow);
+        box-shadow: 4px 4px 0 var(--fuze-green);
+        font-size: 18px;
+        font-weight: 950;
+        letter-spacing: 0;
+        transform: rotate(-5deg);
         flex: 0 0 auto;
     }
+
+    .brand-word { display: inline-block; }
 
     .toolbar-menu {
         position: relative;
@@ -80,7 +110,7 @@
 
     .toolbar-menu summary::-webkit-details-marker { display: none; }
     .toolbar-menu[open] summary,
-    .toolbar-menu summary:hover { background: var(--paper); border-color: var(--clay); }
+    .toolbar-menu summary:hover { background: #fbf3dc; border-color: var(--fuze-sand); }
 
     .menu-panel {
         position: absolute;
@@ -88,7 +118,7 @@
         left: 0;
         min-width: 240px;
         padding: 5px;
-        background: #fff;
+        background: #fffdf7;
         border: 1px solid var(--border);
         border-radius: 9px;
         box-shadow: 0 8px 28px rgba(0,0,0,.16);
@@ -111,10 +141,10 @@
     }
 
     .menu-panel button:hover,
-    .menu-panel button.active { background: var(--paper); color: var(--dark); }
-    .menu-panel button.menu-danger { color: #a33d2d; }
+    .menu-panel button.active { background: #fbf3dc; color: var(--fuze-green); }
+    .menu-panel button.menu-danger { color: var(--fuze-red); }
     .menu-separator { height: 1px; margin: 4px 3px; background: var(--border); }
-    kbd { font: 11px/1.4 Arial, sans-serif; color: #73776f; background: #f4f2ed; border: 1px solid #e1ddd4; border-radius: 4px; padding: 2px 4px; }
+    kbd { font: 11px/1.4 Arial, sans-serif; color: var(--fuze-brown); background: #f7f0df; border: 1px solid var(--fuze-sage); border-radius: 4px; padding: 2px 4px; }
 
     .toolbar-divider { height: 26px; width: 1px; flex: 0 0 1px; background: var(--border); }
 
@@ -126,7 +156,7 @@
         min-width: 0;
     }
 
-    .toolbar-label { font-size: 11px; color: #6c716b; }
+    .toolbar-label { font-size: 11px; color: var(--fuze-brown); }
 
     button, select, input[type="number"] {
         height: 30px;
@@ -138,10 +168,10 @@
     }
 
     button { padding: 0 8px; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
-    button:hover { background: var(--paper); border-color: var(--clay); }
+    button:hover { background: #fbf3dc; border-color: var(--fuze-sand); }
     button:active { transform: translateY(1px); }
     button.active { background: var(--pine); border-color: var(--pine); color: white; }
-    button.danger:hover { background: #f8e8e3; border-color: #bd654d; }
+    button.danger:hover { background: #f8e8e3; border-color: var(--fuze-red); }
 
     input[type="color"] {
         width: 30px; height: 30px; padding: 2px; border: 1px solid var(--border);
@@ -161,7 +191,7 @@
         background: var(--swatch); border: 1px solid rgba(48,53,47,.22); box-shadow: inset 0 0 0 1px rgba(255,255,255,.2);
     }
     .color-swatch:hover { transform: scale(1.08); border-color: var(--dark); }
-    .color-swatch[aria-pressed="true"] { outline: 2px solid var(--clay); outline-offset: 2px; }
+    .color-swatch[aria-pressed="true"] { outline: 2px solid var(--fuze-yellow); outline-offset: 2px; }
     .custom-color-label { display: block; margin-top: 12px; margin-bottom: 5px; font-size: 12px; color: var(--dark); }
     #customColorInput { width: 100%; height: 32px; padding: 2px; }
 
@@ -176,7 +206,8 @@
     @media (max-width: 760px) {
         .toolbar { justify-content: flex-start; gap: 6px; padding-inline: 6px; overflow-x: auto; overflow-y: hidden; }
         .toolbar-label { display: none; }
-        .brand-mark { font-size: 15px; }
+        .brand { font-size: 1.08rem; gap: 7px; }
+        .brand-mark { width: 28px; height: 28px; font-size: 16px; }
         #imageResizeSelect { width: 92px; }
         #strokeOpacityInput { width: 60px; }
     }
@@ -304,7 +335,7 @@
         border-top: 1px solid var(--border);
 
         font-size: 12px;
-        color: #6c716b;
+        color: var(--fuze-brown);
 
         z-index: 20;
     }
@@ -381,8 +412,8 @@
         justify-content: space-between;
         gap: 16px;
         padding: 8px 16px 8px 22px;
-        background: #fff;
-        border-bottom: 1px solid var(--border);
+        background: #fffdf7;
+        border-bottom: 2px solid var(--fuze-yellow);
     }
     .help-modal-header h2 {
         margin: 0;
@@ -422,3 +453,161 @@
         .help-modal { width: 100%; height: 100%; border-radius: 0; }
         .help-modal-header { min-height: 50px; padding-inline: 14px; }
     }
+
+
+/* --------------------------------------------------
+   STAMP TEXT DIALOG — Fuze standard palette
+-------------------------------------------------- */
+.stamp-modal-backdrop[hidden] { display: none; }
+.stamp-modal-backdrop {
+    --stamp-yellow: #edc13a;
+    --stamp-sand: #e0c477;
+    --stamp-red: #ad0404;
+    --stamp-brown: #8b6948;
+    --stamp-sage: #b9b99f;
+    --stamp-green: #426a54;
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(35, 43, 36, .66);
+    backdrop-filter: blur(3px);
+}
+.stamp-modal {
+    width: min(460px, 100%);
+    overflow: hidden;
+    background: #fffdf7;
+    border: 1px solid var(--stamp-sage, #b9b99f);
+    border-top: 5px solid var(--stamp-yellow, #edc13a);
+    border-radius: 14px;
+    box-shadow: 0 22px 70px rgba(24, 34, 26, .32);
+}
+.stamp-modal-header {
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 16px 10px 22px;
+    color: #fffdf7;
+    background: var(--stamp-green, #426a54);
+    border-bottom: 1px solid rgba(0, 0, 0, .08);
+}
+.stamp-modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: .1px;
+}
+.stamp-modal-header .help-modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 36px;
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, .35);
+    border-radius: 8px;
+    color: #fffdf7;
+    background: transparent;
+    font: 30px/1 Arial, sans-serif;
+    cursor: pointer;
+}
+.stamp-modal-header .help-modal-close:hover {
+    color: var(--stamp-green, #426a54);
+    background: var(--stamp-sand, #e0c477);
+    border-color: var(--stamp-sand, #e0c477);
+}
+.stamp-modal-form {
+    display: grid;
+    gap: 11px;
+    padding: 22px;
+}
+.stamp-modal-form label {
+    color: var(--stamp-green, #426a54);
+    font-weight: 700;
+}
+.stamp-modal-form textarea {
+    width: 100%;
+    min-height: 92px;
+    resize: vertical;
+    box-sizing: border-box;
+    padding: 11px 13px;
+    border: 1px solid var(--stamp-sage, #b9b99f);
+    border-radius: 8px;
+    outline: none;
+    color: #30352f;
+    background: #fff;
+    font: inherit;
+    line-height: 1.45;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.stamp-modal-form textarea:focus {
+    border-color: var(--stamp-green, #426a54);
+    box-shadow: 0 0 0 3px rgba(66, 106, 84, .15);
+}
+.stamp-modal-form p {
+    margin: 0;
+    color: var(--stamp-brown, #8b6948);
+    font-size: 12px;
+    line-height: 1.45;
+}
+.stamp-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    margin-top: 9px;
+}
+.stamp-modal-actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    min-height: 40px;
+    padding: 0 17px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    font: 600 14px/1.2 "Work Sans", Arial, sans-serif;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
+    appearance: none;
+    -webkit-appearance: none;
+}
+.stamp-cancel-button {
+    color: #3b352c;
+    background: var(--stamp-sand, #e0c477);
+    border-color: var(--stamp-sand, #e0c477) !important;
+}
+.stamp-cancel-button:hover {
+    background: var(--stamp-yellow, #edc13a);
+    border-color: var(--stamp-yellow, #edc13a) !important;
+}
+.stamp-confirm-button {
+    color: #fff;
+    background: var(--stamp-red, #ad0404);
+    border-color: var(--stamp-red, #ad0404) !important;
+}
+.stamp-confirm-button:hover {
+    background: #8f0303;
+    border-color: #8f0303 !important;
+}
+.stamp-modal-actions button:focus-visible,
+.stamp-modal-header .help-modal-close:focus-visible {
+    outline: 3px solid var(--stamp-yellow, #edc13a);
+    outline-offset: 2px;
+}
+body.stamp-modal-open { overflow: hidden; }
+@media (max-width: 480px) {
+    .stamp-modal-backdrop { padding: 14px; }
+    .stamp-modal-form { padding: 18px; }
+    .stamp-modal-actions { gap: 8px; }
+    .stamp-modal-actions button { padding-inline: 13px; }
+}

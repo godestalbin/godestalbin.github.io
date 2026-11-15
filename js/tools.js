@@ -50,6 +50,32 @@
         strokeWidthInput.title = "Épaisseur";
     }
 
+    function getHighlightFillColor(color = getColor(), alpha = 0.30) {
+        const value = String(color || "#ffd21e").trim();
+        let r, g, b;
+        const hex = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+        if (hex) {
+            const h = hex[1].length === 3 ? hex[1].split("").map(c => c + c).join("") : hex[1];
+            r = parseInt(h.slice(0, 2), 16);
+            g = parseInt(h.slice(2, 4), 16);
+            b = parseInt(h.slice(4, 6), 16);
+        } else {
+            const rgb = value.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+            if (rgb) [, r, g, b] = rgb.map(Number);
+            else return `rgba(255,210,30,${alpha})`;
+        }
+        return `rgba(${r},${g},${b},${alpha})`;
+    }
+
+    function makeOuterShapeShadow() {
+        return new fabric.Shadow({
+            color: "rgba(0,0,0,0.48)",
+            blur: 8,
+            offsetX: 0,
+            offsetY: 0
+        });
+    }
+
     function getStrokeOpacity() {
         const value = Number(strokeOpacityInput?.value ?? 55);
         return Math.max(0.1, Math.min(1, (Number.isFinite(value) ? value : 55) / 100));
@@ -187,6 +213,8 @@
             const existingBorder = canvas.getObjects().find(obj => obj.fuzeBorderOwnerId === image.fuzeBorderId);
             if (existingBorder) {
                 canvas.remove(existingBorder);
+                const existingShadow = canvas.getObjects().find(obj => obj.fuzeBorderShadowOwnerId === image.fuzeBorderId);
+                if (existingShadow) canvas.remove(existingShadow);
                 canvas.requestRenderAll();
                 updateStatus("Bordure supprimée");
                 return;
@@ -198,6 +226,25 @@
         const bounds = image.getBoundingRect();
         const width = getStrokeWidth();
         const strokeWidth = width;
+
+        // Cette forme noire est placée derrière l'image : celle-ci masque
+        // toute son ombre intérieure et ne laisse visible que l'ombre extérieure.
+        const shadowBacking = new fabric.Rect({
+            left: bounds.left - strokeWidth,
+            top: bounds.top - strokeWidth,
+            width: Math.max(1, bounds.width + strokeWidth),
+            height: Math.max(1, bounds.height + strokeWidth),
+            rx: Math.min(14, Math.max(4, Math.min(bounds.width, bounds.height) * 0.04)),
+            ry: Math.min(14, Math.max(4, Math.min(bounds.width, bounds.height) * 0.04)),
+            fill: "#000000",
+            strokeWidth: 0,
+            shadow: makeOuterShapeShadow(),
+            selectable: false,
+            evented: false,
+            objectCaching: false,
+            fuzeBorderShadowOwnerId: id
+        });
+        canvas.add(shadowBacking);
 
         const border = new fabric.Rect({
             left: bounds.left - strokeWidth,
@@ -224,7 +271,8 @@
         const imageIndex = objects.indexOf(image);
 
         if (imageIndex !== -1) {
-            canvas.moveObjectTo(border, imageIndex + 1);
+            canvas.moveObjectTo(shadowBacking, imageIndex);
+            canvas.moveObjectTo(border, canvas.getObjects().indexOf(image) + 1);
         }
         // Reassert these flags after insertion/reordering: the image remains
         // the only interactive object in the image + border pair.
@@ -239,6 +287,7 @@
     function syncImageBorder(image) {
         if (!image || image.type !== "image" || !image.fuzeBorderId) return;
         const border = canvas.getObjects().find(obj => obj.fuzeBorderOwnerId === image.fuzeBorderId);
+        const shadowBacking = canvas.getObjects().find(obj => obj.fuzeBorderShadowOwnerId === image.fuzeBorderId);
         if (!border) return;
         const bounds = image.getBoundingRect();
         const width = Number(border.strokeWidth) || 1;
@@ -254,6 +303,17 @@
             ry: radius
         });
         border.setCoords();
+        if (shadowBacking) {
+            shadowBacking.set({
+                left: bounds.left - strokeWidth,
+                top: bounds.top - strokeWidth,
+                width: Math.max(1, bounds.width + strokeWidth),
+                height: Math.max(1, bounds.height + strokeWidth),
+                rx: radius,
+                ry: radius
+            });
+            shadowBacking.setCoords();
+        }
     }
 
     function updateImageBorderStyle(image, color = getColor(), width = getStrokeWidth()) {
@@ -263,6 +323,189 @@
         border.set({ stroke: color, strokeWidth: width, opacity: getStrokeOpacity() });
         syncImageBorder(image);
     }
+
+    /* =====================================================
+       TAMPON / STAMP
+    ===================================================== */
+
+    let stampText = "";
+    const stampModal = document.getElementById("stampModal");
+    const stampForm = document.getElementById("stampForm");
+    const stampTextInput = document.getElementById("stampTextInput");
+
+    function closeStampDialog(cancelled = false) {
+        if (stampModal) stampModal.hidden = true;
+        document.body.classList.remove("stamp-modal-open");
+        if (cancelled) setTool("select");
+    }
+
+    function openStampDialog() {
+        if (!stampModal || !stampTextInput) return;
+        stampTextInput.value = stampText;
+        stampModal.hidden = false;
+        document.body.classList.add("stamp-modal-open");
+        requestAnimationFrame(() => { stampTextInput.focus(); stampTextInput.select(); });
+    }
+
+    stampForm?.addEventListener("submit", event => {
+        event.preventDefault();
+        const value = stampTextInput.value.trim();
+        if (!value) { stampTextInput.focus(); return; }
+        stampText = value.toLocaleUpperCase();
+        closeStampDialog(false);
+        updateStatus(FUZE_LANGUAGE === "en" ? "Stamp: click on the canvas to place it" : "Tampon : cliquez sur le canvas pour le déposer");
+        canvas.upperCanvasEl.style.cursor = "crosshair";
+    });
+
+    document.getElementById("closeStampButton")?.addEventListener("click", () => closeStampDialog(true));
+    document.getElementById("cancelStampButton")?.addEventListener("click", () => closeStampDialog(true));
+    stampModal?.addEventListener("click", event => { if (event.target === stampModal) closeStampDialog(true); });
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && stampModal && !stampModal.hidden) {
+            event.preventDefault();
+            closeStampDialog(true);
+        }
+    });
+
+    function createStampSvg(text, color, fontSize, strokeWidth) {
+        const measureCanvas = document.createElement("canvas");
+        const measureContext = measureCanvas.getContext("2d");
+        measureContext.font = `${fontSize}px Impact, Haettenschweiler, "Arial Narrow", sans-serif`;
+        const lines = String(text).split(/\r?\n/).filter(Boolean);
+        const lineHeight = fontSize * 0.92;
+        const textWidth = Math.max(1, ...lines.map(line => measureContext.measureText(line).width));
+        // STAMP LAYOUT PARAMETERS (all values are relative to the SVG's source pixels).
+        // Change these two values to adjust the fixed clear space between text and frame.
+        // They deliberately do NOT depend on strokeWidth.
+        const textFrameGapX = fontSize * 0.16;
+        const textFrameGapY = fontSize * 0.12;
+
+        // The frame grows outwards when its stroke gets thicker, so its INNER edge
+        // stays at exactly the same distance from the text.
+        const width = Math.ceil(textWidth + 2 * (textFrameGapX + strokeWidth));
+        const height = Math.ceil(lines.length * lineHeight + 2 * (textFrameGapY + strokeWidth));
+        const inset = strokeWidth / 2;
+        const radius = Math.max(7, Math.min(fontSize * 0.2, height * 0.18));
+        const frame = `<rect x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}" rx="${radius}" ry="${radius}" fill="none" stroke="${color}" stroke-width="${strokeWidth}"/>`;
+        const firstBaseline = (height - (lines.length - 1) * lineHeight) / 2 + fontSize * 0.34;
+        const textMarkup = lines.map((line, index) =>
+            `<text x="${width / 2}" y="${firstBaseline + index * lineHeight}" text-anchor="middle" font-family="Impact, Haettenschweiler, Arial Narrow, sans-serif" font-size="${fontSize}" font-weight="400" letter-spacing="0.5" fill="${color}">${escapeStampXml(line)}</text>`
+        ).join("");
+
+        // Deterministic irregular ink voids: the same stamp remains visually stable
+        // when its color, size or border thickness is edited.
+        let seed = Array.from(text).reduce((sum, char) => ((sum * 31) + char.charCodeAt(0)) >>> 0, 2166136261);
+        const random = () => {
+            seed = (seed * 1664525 + 1013904223) >>> 0;
+            return seed / 4294967296;
+        };
+        const holes = [];
+
+        // STAMP GRAIN PARAMETERS — safe to adjust without changing the algorithm.
+        // Higher holesPerArea = more numerous ink voids (denser worn texture).
+        // Smaller radius values = finer grain. Values are in SVG source pixels.
+        const grain = {
+            holesPerArea: 1 / 10,  // previous version: approximately 1 / 210
+            minimumHoles: 120,
+            maximumHoles: 12000,
+            minRadiusX: 0.01,
+            maxRadiusX: 1.82,
+            minRadiusY: 0.01,
+            maxRadiusY: 1.70,
+            irregularity: 0.99
+        };
+        const count = Math.min(grain.maximumHoles, Math.max(
+            grain.minimumHoles,
+            Math.round(width * height * grain.holesPerArea)
+        ));
+        for (let i = 0; i < count; i++) {
+            const radiusX = grain.minRadiusX + random() * (grain.maxRadiusX - grain.minRadiusX);
+            const radiusY = grain.minRadiusY + random() * (grain.maxRadiusY - grain.minRadiusY);
+            const cx = 3 + random() * (width - 6);
+            const cy = 3 + random() * (height - 6);
+            const vertices = 5 + Math.floor(random() * 5);
+            const points = [];
+            for (let point = 0; point < vertices; point++) {
+                const angle = (Math.PI * 2 * point / vertices) + (random() - 0.5) * grain.irregularity;
+                const roughness = 0.55 + random() * 0.65;
+                points.push([
+                    (cx + Math.cos(angle) * radiusX * roughness).toFixed(2),
+                    (cy + Math.sin(angle) * radiusY * roughness).toFixed(2)
+                ]);
+            }
+            const path = points.map((point, index) => `${index ? "L" : "M"}${point[0]} ${point[1]}`).join(" ") + " Z";
+            holes.push(`<path d="${path}" fill="black"/>`);
+        }
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><defs><mask id="inkMask"><rect width="100%" height="100%" fill="white"/>${holes.join("")}</mask></defs><g mask="url(#inkMask)">${frame}${textMarkup}</g></svg>`;
+        return { svg, width, height };
+    }
+
+    function escapeStampXml(value) {
+        return String(value).replace(/[&<>"']/g, char => ({
+            "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;"
+        })[char]);
+    }
+
+    async function createStampObject(text, x, y, style = {}) {
+        const color = style.color || getColor();
+        const fontSize = Number(style.fontSize || getFontSize());
+        const strokeWidth = Number(style.strokeWidth || getStrokeWidth());
+        const opacity = Number(style.opacity ?? getStrokeOpacity());
+        const { svg, width, height } = createStampSvg(text, color, fontSize, strokeWidth);
+        const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+        const image = await fabric.Image.fromURL(dataUrl);
+        image.set({
+            left: x, top: y, originX: "center", originY: "center",
+            opacity, selectable: true, evented: true, objectCaching: false
+        });
+        image.fuzeTool = "stamp";
+        image.stampText = text;
+        image.stampFontSize = fontSize;
+        image.stampStrokeWidth = strokeWidth;
+        image.stampColor = color;
+        image.stampWidth = width;
+        image.stampHeight = height;
+        return image;
+    }
+
+    async function addStampAt(event) {
+        if (!stampText) { openStampDialog(); return; }
+        const pointer = canvas.getScenePoint(event);
+        const stamp = await createStampObject(stampText, pointer.x, pointer.y);
+        canvas.add(stamp);
+        canvas.setActiveObject(stamp);
+        canvas.requestRenderAll();
+        saveHistory();
+        trackEvent("element_created", { element_type: "stamp" });
+    }
+
+    async function updateStampObject(object, changes = {}) {
+        const style = {
+            color: changes.color ?? object.stampColor,
+            fontSize: changes.fontSize ?? object.stampFontSize,
+            strokeWidth: changes.strokeWidth ?? object.stampStrokeWidth,
+            opacity: changes.opacity ?? object.opacity
+        };
+        const replacement = await createStampObject(object.stampText, object.left, object.top, style);
+        replacement.set({
+            angle: object.angle,
+            scaleX: object.scaleX,
+            scaleY: object.scaleY,
+            flipX: object.flipX,
+            flipY: object.flipY
+        });
+        const index = canvas.getObjects().indexOf(object);
+        if (index < 0) return;
+        canvas.remove(object);
+        canvas.insertAt(index, replacement);
+        canvas.setActiveObject(replacement);
+        replacement.setCoords();
+        canvas.requestRenderAll();
+        syncControlsFromSelectedObject();
+        saveHistory();
+    }
+
 
     function setTool(tool) {
 
@@ -321,11 +564,11 @@
 
             canvas.forEachObject(
                 object => {
-                    // Les objets restent détectables pendant qu'un outil de
-                    // dessin est actif : un clic dessus doit pouvoir basculer
-                    // en mode Sélection. Les bordures d'image restent décoratives.
+                    // Les objets restent détectables (evented) pour distinguer
+                    // un clic d'un glissement, mais ne sont pas déplaçables par
+                    // Fabric tant qu'un outil de dessin est actif.
                     const isImageBorder = object.fuzeTool === "border" || object.fuzeBorderOwnerId;
-                    object.selectable = !isImageBorder;
+                    object.selectable = false;
                     object.evented = !isImageBorder;
                 }
             );
@@ -340,6 +583,7 @@
 
         syncThicknessControl();
         canvas.renderAll();
+        if (tool === "stamp") openStampDialog();
     }
 
 
@@ -1591,6 +1835,11 @@
 
     function moveArrowHandle(event) {
         if (!draggingArrowHandle || !editingArrow) return;
+
+        // Le premier déplacement d'une poignée termine l'outil courant :
+        // la poignée reste prioritaire et l'édition se poursuit en mode Sélection.
+        if (currentTool !== "select") setTool("select");
+
         const point = canvas.getScenePoint(event);
         lastArrowHandlePoint = { x: point.x, y: point.y };
         updateArrowHandleAtPoint(
@@ -1909,7 +2158,8 @@
         if (
             currentTool === "select" ||
             currentTool === "text" ||
-            currentTool === "number"
+            currentTool === "number" ||
+            currentTool === "stamp"
         ) {
             return;
         }
@@ -1977,7 +2227,10 @@
                         getColor(),
 
                     strokeWidth:
-                        getStrokeWidth()
+                        getStrokeWidth(),
+                    strokeUniform: true,
+                    lockUniScaling: false,
+                    shadow: makeOuterShapeShadow()
                 });
         }
 
@@ -2011,7 +2264,10 @@
                         getColor(),
 
                     strokeWidth:
-                        getStrokeWidth()
+                        getStrokeWidth(),
+                    strokeUniform: true,
+                    lockUniScaling: false,
+                    shadow: makeOuterShapeShadow()
                 });
         }
 
@@ -2043,13 +2299,12 @@
                     rx: 6,
                     ry: 6,
 
-                    fill:
-                        "rgba(255,220,50,0.30)",
-
-                    stroke:
-                        "rgba(255,210,30,0.85)",
-
-                    strokeWidth: 2,
+                    fill: getHighlightFillColor(),
+                    stroke: getColor(),
+                    strokeWidth: getStrokeWidth(),
+                    strokeUniform: true,
+                    lockUniScaling: false,
+                    shadow: makeOuterShapeShadow(),
                     fuzeTool: "highlight"
                 });
         }
@@ -2086,10 +2341,13 @@
                     fill:
                         "rgba(80,80,80,0.20)",
 
-                    stroke:
-                        "rgba(80,80,80,0.70)",
+                    // Le rectangle de prévisualisation du blur ne doit jamais
+                    // dessiner de contour : seul le remplissage indique la zone.
+                    stroke: "rgba(80,80,80,0)",
 
-                    strokeWidth: 2,
+                    strokeWidth: 0,
+                    strokeUniform: true,
+                    lockUniScaling: false,
 
                     selectable: false,
                     evented: false
@@ -2405,87 +2663,138 @@
     SOURIS CANVAS
     ===================================================== */
 
-    canvas.on(
-        "mouse:down",
-        event => {
+    // Les outils de tracé (rectangle, cercle, highlight, blur, feutre,
+    // flèches) travaillent par clic + déplacement + relâchement.
+    // Si le geste commence sur un objet existant, il s'agit au contraire
+    // d'un déplacement : on bascule en Sélection au seuil de déplacement
+    // et on déplace cet objet, sans démarrer un second tracé.
+    let pendingObjectGesture = null;
+    const OBJECT_DRAG_THRESHOLD = 4; // pixels écran
 
-            if (eyedropperActive) {
-                const color = sampleCanvasColor(event.e);
-
-                // Fabric peut désélectionner l'objet quand le clic de la pipette
-                // tombe sur le fond du canvas. On restaure donc la sélection
-                // mémorisée avant d'appliquer la nouvelle couleur.
-                restoreEyedropperSelection();
-
-                if (color) {
-                    colorInput.value = color;
-                    colorInput.dispatchEvent(new Event("input", { bubbles: true }));
-                    colorInput.dispatchEvent(new Event("change", { bubbles: true }));
-
-                    // updateSelectedObject peut remplacer une flèche : mémoriser
-                    // la sélection mise à jour permet de réutiliser la pipette.
-                    rememberEyedropperSelection();
-                    // La pipette reste active pour permettre plusieurs prélèvements
-                    // successifs sans devoir la réactiver après chaque couleur.
-                    updateStatus("Couleur prélevée : " + color + " — pipette toujours active");
-                } else {
-                    updateStatus("Impossible de prélever cette couleur.");
-                }
-                return;
+    canvas.on("mouse:down", event => {
+        if (eyedropperActive) {
+            const color = sampleCanvasColor(event.e);
+            restoreEyedropperSelection();
+            if (color) {
+                colorInput.value = color;
+                colorInput.dispatchEvent(new Event("input", { bubbles: true }));
+                colorInput.dispatchEvent(new Event("change", { bubbles: true }));
+                rememberEyedropperSelection();
+                updateStatus("Couleur prélevée : " + color + " — pipette toujours active");
+            } else {
+                updateStatus("Impossible de prélever cette couleur.");
             }
+            return;
+        }
 
-            // Si un outil de création est actif mais que le clic touche un
-            // objet existant, privilégier cet objet : revenir immédiatement
-            // en mode Sélection au lieu de dessiner/ajouter un élément dessus.
-            if (
-                currentTool !== "select" &&
-                event.target &&
-                event.target.fuzeTool !== "border" &&
-                !event.target.fuzeBorderOwnerId
-            ) {
+        // Outils à clic unique : aucune logique de glissement ne s'applique.
+        if (currentTool === "number") { addNumberAt(event.e); return; }
+        if (currentTool === "stamp") { addStampAt(event.e); return; }
+        if (currentTool === "text") { addTextAt(event.e); return; }
+
+        // Une image sert de support de dessin : avec un outil de tracé actif,
+        // cliquer/glisser dessus doit toujours démarrer le tracé. Seuls les
+        // objets d'annotation déjà créés interceptent le geste pour être déplacés.
+        // Si Fabric a déjà reconnu une poignée/zone de transformation,
+        // laisser sa transformation prendre la main. Sans ce garde-fou,
+        // le geste est intercepté comme un déplacement manuel d'objet.
+        const viewportPoint = canvas.getViewportPoint(event.e);
+        const activeObject = canvas.getActiveObject();
+        // Fabric ne renseigne pas toujours _currentTransform au moment où cet
+        // écouteur reçoit mouse:down. Tester directement les contrôles de
+        // l'objet actif évite qu'un clic sur une poignée soit interprété comme
+        // le début d'un nouveau tracé (rectangle/cercle/highlight/blur/feutre).
+        const activeObjectControl = activeObject &&
+            typeof activeObject.findControl === "function"
+            ? activeObject.findControl(viewportPoint)
+            : null;
+        const targetControl = event.target &&
+            typeof event.target.findControl === "function"
+            ? event.target.findControl(viewportPoint)
+            : null;
+        const fabricTransformStarted = !!canvas._currentTransform ||
+            !!activeObjectControl || !!targetControl ||
+            !!event.target?.__corner;
+
+        if (fabricTransformStarted) {
+            // Le changement d'outil ne doit pas annuler l'événement Fabric :
+            // Fabric poursuit ainsi la transformation de la poignée cliquée.
+            if (currentTool !== "select") setTool("select");
+            return;
+        }
+
+        if (currentTool !== "select" && event.target &&
+            event.target.type !== "image" &&
+            event.target.fuzeTool !== "border" && !event.target.fuzeBorderOwnerId) {
+            const scenePoint = canvas.getScenePoint(event.e);
+            pendingObjectGesture = {
+                target: event.target,
+                clientX: event.e.clientX,
+                clientY: event.e.clientY,
+                lastX: scenePoint.x,
+                lastY: scenePoint.y,
+                moved: false
+            };
+            return;
+        }
+
+        startDrawing(event);
+    });
+
+    canvas.on("mouse:move", event => {
+        if (pendingObjectGesture) {
+            const gesture = pendingObjectGesture;
+            const dxScreen = event.e.clientX - gesture.clientX;
+            const dyScreen = event.e.clientY - gesture.clientY;
+
+            if (!gesture.moved && Math.hypot(dxScreen, dyScreen) >= OBJECT_DRAG_THRESHOLD) {
+                gesture.moved = true;
                 setTool("select");
-                return;
+                if (canvas.getObjects().includes(gesture.target)) {
+                    canvas.setActiveObject(gesture.target);
+                }
             }
 
-            if (currentTool === "number") {
-                addNumberAt(event.e);
-                return;
+            if (gesture.moved && canvas.getObjects().includes(gesture.target)) {
+                const point = canvas.getScenePoint(event.e);
+                gesture.target.set({
+                    left: gesture.target.left + (point.x - gesture.lastX),
+                    top: gesture.target.top + (point.y - gesture.lastY)
+                });
+                gesture.lastX = point.x;
+                gesture.lastY = point.y;
+                gesture.target.setCoords();
+                canvas.requestRenderAll();
             }
+            return;
+        }
 
-            if (
-                currentTool ===
-                "text"
-            ) {
+        drawingMove(event);
+    });
 
-                addTextAt(
-                    event.e
-                );
+    canvas.on("mouse:up", () => {
+        if (pendingObjectGesture) {
+            const gesture = pendingObjectGesture;
+            pendingObjectGesture = null;
 
-                return;
+            if (!gesture.moved) {
+                // Un simple clic sur un objet avec un outil de tracé sélectionne
+                // l'objet et revient en mode Sélection, sans créer de forme.
+                setTool("select");
+                if (gesture.target && canvas.getObjects().includes(gesture.target)) {
+                    canvas.setActiveObject(gesture.target);
+                    canvas.requestRenderAll();
+                }
+            } else {
+                canvas.requestRenderAll();
+                saveHistory();
+                updateEmptyMessage();
             }
-
-
-            startDrawing(event);
+            return;
         }
-    );
 
-
-    canvas.on(
-        "mouse:move",
-        event => {
-
-            drawingMove(event);
-        }
-    );
-
-
-    canvas.on(
-        "mouse:up",
-        () => {
-
-            finishDrawing();
-        }
-    );
+        finishDrawing();
+    });
 
     // Fabric peut rétablir son curseur de sélection.
     // Tant que la pipette est active, on lui redonne la priorité.
@@ -2720,8 +3029,9 @@
                     stroke:
                         "#ffffff",
 
+                    // Le contour blanc et son halo suivent la taille du texte.
                     strokeWidth:
-                        8,
+                        Math.max(2, getFontSize() * 0.25),
 
                     strokeLineJoin:
                         "round",
@@ -2754,7 +3064,7 @@
                                 "rgba(99, 99, 99, 0.85)",
 
                             blur:
-                                10,
+                                Math.max(3, getFontSize() * 0.3125),
 
                             offsetX:
                                 0,
@@ -2857,6 +3167,14 @@
     ["object:moving", "object:scaling", "object:rotating", "object:modified"].forEach(eventName => {
         canvas.on(eventName, event => {
             const object = event.target;
+
+            // Un redimensionnement, une rotation ou un déplacement via les
+            // contrôles Fabric doit quitter l'outil de dessin dès le premier
+            // mouvement effectif, sans interrompre la transformation en cours.
+            if (currentTool !== "select" &&
+                ["object:moving", "object:scaling", "object:rotating"].includes(eventName)) {
+                setTool("select");
+            }
 
             if (eventName === "object:moving" && object && event.e?.shiftKey) {
                 // Aimante la position de l'objet ou du groupe sélectionné
@@ -3116,6 +3434,27 @@
     // destruction de l'ActiveSelection lors de la désélection.
     canvas.on("object:modified", event => {
         const object = event.target;
+
+        // Fabric applique parfois le facteur de transformation au contour
+        // lors du redimensionnement. On reporte l'échelle dans la géométrie
+        // et on conserve strokeWidth à sa valeur initiale.
+        if (object && object.strokeWidth > 0 && object.strokeUniform !== true &&
+            ["rect", "ellipse"].includes(object.type)) {
+            object.set({ strokeUniform: true });
+        }
+        if (object && object.strokeWidth > 0 && ["rect", "ellipse"].includes(object.type)) {
+            const sx = Number(object.scaleX) || 1;
+            const sy = Number(object.scaleY) || 1;
+            if (Math.abs(sx - 1) > 0.0001 || Math.abs(sy - 1) > 0.0001) {
+                if (object.type === "rect") {
+                    object.set({ width: object.width * sx, height: object.height * sy, scaleX: 1, scaleY: 1 });
+                } else {
+                    object.set({ rx: object.rx * sx, ry: object.ry * sy, scaleX: 1, scaleY: 1 });
+                }
+                object.setCoords();
+            }
+        }
+
         if (isActiveSelectionObject(object)) {
             // Les coordonnées des flèches ont été mises à jour par delta pendant
             // le déplacement. On ne touche pas à leur géométrie au commit.
