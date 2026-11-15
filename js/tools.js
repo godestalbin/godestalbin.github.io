@@ -544,9 +544,9 @@
                     // Les bordures d'image restent purement décoratives,
                     // même en mode Sélection : le clic traverse la bordure
                     // et cible directement l'image située dessous.
-                    const isImageBorder = object.fuzeTool === "border" || object.fuzeBorderOwnerId;
-                    object.selectable = !isImageBorder;
-                    object.evented = !isImageBorder;
+                    const isDecoration = object.fuzeTool === "border" || object.fuzeBorderOwnerId || object.fuzeMagnifierRole === "connector";
+                    object.selectable = !isDecoration;
+                    object.evented = !isDecoration;
                 }
             );
 
@@ -567,15 +567,16 @@
                     // Les objets restent détectables (evented) pour distinguer
                     // un clic d'un glissement, mais ne sont pas déplaçables par
                     // Fabric tant qu'un outil de dessin est actif.
-                    const isImageBorder = object.fuzeTool === "border" || object.fuzeBorderOwnerId;
+                    const isDecoration = object.fuzeTool === "border" || object.fuzeBorderOwnerId || object.fuzeMagnifierRole === "connector";
                     object.selectable = false;
-                    object.evented = !isImageBorder;
+                    object.evented = !isDecoration;
                 }
             );
 
             updateStatus(
                 tool === "felt" ? "Feutre : tracer librement" :
                 tool === "highlight" ? "Highlight : tracer un rectangle jaune" :
+                tool === "magnifier" ? (FUZE_LANGUAGE === "en" ? "Magnifier: draw the area to enlarge" : "Loupe : tracer la zone à agrandir") :
                 tool === "number" ? (FUZE_LANGUAGE === "en" ? "Number: click to add a circled number" : "Numéro : cliquez pour ajouter un numéro entouré") :
                 "Outil : " + tool
             );
@@ -2193,6 +2194,20 @@
             return;
         }
 
+        if (currentTool === "magnifier") {
+            temporaryObject = new fabric.Rect({
+                left: drawStart.x, top: drawStart.y, width: 1, height: 1,
+                originX: "left", originY: "top",
+                fill: "rgba(70, 115, 210, 0.16)",
+                stroke: "rgba(40, 75, 150, 0.9)", strokeWidth: 1,
+                strokeUniform: true, selectable: false, evented: false,
+                objectCaching: false
+            });
+            canvas.add(temporaryObject);
+            canvas.requestRenderAll();
+            return;
+        }
+
 
         /* -------------------------------------------------
         RECTANGLE
@@ -2447,7 +2462,7 @@
         const width = Math.abs(dx);
         const height = Math.abs(dy);
 
-        if (currentTool === "rectangle" || currentTool === "highlight" || currentTool === "blur") {
+        if (currentTool === "rectangle" || currentTool === "highlight" || currentTool === "blur" || currentTool === "magnifier") {
             temporaryObject.set({ left, top, width, height });
         } else if (currentTool === "circle") {
             temporaryObject.set({ left, top, rx: width / 2, ry: height / 2 });
@@ -2508,6 +2523,17 @@
 
         temporaryObject = null;
         freehandPoints = [];
+
+        if (currentTool === "magnifier") {
+            canvas.remove(object);
+            finishMagnifierDrawing({
+                left: object.left, top: object.top,
+                width: object.width * (object.scaleX || 1),
+                height: object.height * (object.scaleY || 1)
+            });
+            updateEmptyMessage();
+            return;
+        }
 
         if (currentTool === "arrow" || currentTool === "simpleArrow") {
 
@@ -2582,6 +2608,11 @@
                 object
             );
 
+            // Fabric peut conserver à l'écran le dernier rendu du rectangle de
+            // prévisualisation après canvas.remove(). Le blur ne doit surtout
+            // pas capturer ce rectangle dans son propre snapshot : forcer le
+            // rendu du canvas nettoyé avant la capture réelle.
+            canvas.renderAll();
 
             if (
                 width >= 4 &&
@@ -2724,7 +2755,7 @@
         }
 
         if (currentTool !== "select" && event.target &&
-            event.target.type !== "image" &&
+            (event.target.type !== "image" || event.target.fuzeMagnifierRole === "lens") &&
             event.target.fuzeTool !== "border" && !event.target.fuzeBorderOwnerId) {
             const scenePoint = canvas.getScenePoint(event.e);
             pendingObjectGesture = {
@@ -2764,6 +2795,9 @@
                 gesture.lastX = point.x;
                 gesture.lastY = point.y;
                 gesture.target.setCoords();
+                if (gesture.target.fuzeMagnifierId && typeof syncMagnifierGeometry === "function") {
+                    syncMagnifierGeometry(gesture.target.fuzeMagnifierId);
+                }
                 canvas.requestRenderAll();
             }
             return;
@@ -2786,6 +2820,11 @@
                     canvas.requestRenderAll();
                 }
             } else {
+                if (gesture.target.fuzeMagnifierId &&
+                    gesture.target.fuzeMagnifierRole === "source" &&
+                    typeof refreshMagnifierSnapshot === "function") {
+                    refreshMagnifierSnapshot(gesture.target.fuzeMagnifierId);
+                }
                 canvas.requestRenderAll();
                 saveHistory();
                 updateEmptyMessage();
@@ -3130,6 +3169,29 @@
         editingText = text;
         editingTextChanged = false;
     });
+
+    // Échap doit quitter immédiatement l'édition du texte Fabric et revenir
+    // au mode Sélection. Le listener en capture est volontaire : le textarea
+    // caché utilisé par Fabric peut intercepter la touche avant le listener
+    // clavier général de shortcuts.js.
+    document.addEventListener("keydown", event => {
+        if (event.key !== "Escape") return;
+
+        const activeText = canvas.getActiveObject();
+        const textBeingEdited =
+            (editingText && editingText.isEditing && editingText) ||
+            (activeText && activeText.isEditing && activeText);
+
+        if (!textBeingEdited) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        textBeingEdited.exitEditing();
+        if (currentTool !== "select") setTool("select");
+        canvas.requestRenderAll();
+    }, true);
 
 
     canvas.on("text:changed", event => {

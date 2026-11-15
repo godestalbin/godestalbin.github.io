@@ -709,7 +709,8 @@ document.addEventListener("keydown", event => {
             c: "circle",
             f: "felt",
             h: "highlight",
-            b: "blur"
+            b: "blur",
+            z: "magnifier"
         };
         if (toolByKey[key]) {
             event.preventDefault();

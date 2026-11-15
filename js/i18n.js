@@ -16,7 +16,7 @@ const FUZE_I18N = {
         clearPanel: "Effacer le canvas", select: "Sélection", text: "Texte", number: "Numéro",
         arrow: "Flèche", simpleArrow: "Flèche simple", rectangle: "Rectangle", circle: "Cercle", felt: "Feutre",
         highlight: "Highlight", imageSize: "Taille image",
-        highlight: "Highlight", blur: "Brouillage", border: "Bordure", imageSize: "Taille image",
+        highlight: "Highlight", blur: "Brouillage", magnifier: "Zoom", border: "Bordure", imageSize: "Taille image",
         color: "Couleur", thickness: "Épaisseur", transparency: "Transparence",
         textSize: "Taille du texte", zoom: "Zoom", toolbar: "Outils Fuze",
         imageSizeTitle: "Taille appliquée aux images chargées ou collées",
@@ -34,7 +34,7 @@ const FUZE_I18N = {
         clearPanel: "Clear canvas", select: "Select", text: "Text", number: "Number",
         arrow: "Arrow", simpleArrow: "Simple arrow", rectangle: "Rectangle", circle: "Circle", felt: "Felt",
         highlight: "Highlight", border: "Border", imageSize: "Image size",
-        highlight: "Highlight", blur: "Blur", imageSize: "Image size",
+        highlight: "Highlight", blur: "Blur", magnifier: "Zoom", imageSize: "Image size",
         color: "Color", thickness: "Thickness", transparency: "Transparency",
         textSize: "Text size", zoom: "Zoom", toolbar: "Fuze tools",
         imageSizeTitle: "Size applied to loaded or pasted images",
@@ -76,7 +76,7 @@ function applyFuzeLanguage() {
         ['[data-tool="arrow"]', 'arrow'], ['[data-tool="simpleArrow"]', 'simpleArrow'], ['[data-tool="rectangle"]', 'rectangle'],
         ['[data-tool="circle"]', 'circle'], ['[data-tool="felt"]', 'felt'],
         ['[data-tool="highlight"]', 'highlight'],
-        ['[data-tool="blur"]', 'blur'], ['[data-tool="border"]', 'border']
+        ['[data-tool="blur"]', 'blur'], ['[data-tool="magnifier"]', 'magnifier'], ['[data-tool="border"]', 'border']
     ];
     for (const [selector, key] of menuLabels) {
         const el = document.querySelector(selector);

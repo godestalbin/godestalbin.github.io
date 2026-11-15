@@ -33,6 +33,8 @@ const SERIALIZED_PROPERTIES = [
     "blurRadius",
     "fuzeBorderId",
     "fuzeBorderOwnerId",
+    "fuzeMagnifierId",
+    "fuzeMagnifierRole",
 
 ];
 
