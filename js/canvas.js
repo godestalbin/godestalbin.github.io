@@ -29,9 +29,22 @@ function updateStatus(text) {
         "Impossible de coller l'image": "Could not paste image",
         "Impossible de prélever cette couleur.": "Could not pick this color.",
         "Sélection multiple : les épaisseurs sont différentes": "Multiple selection: thickness values differ",
-        "Épaisseur": "Thickness"
+        "Épaisseur": "Thickness",
+        "Objet copié": "Object copied",
+        "objets copiés": "objects copied",
+        "Objet collé": "Object pasted",
+        "objets collés": "objects pasted",
+        "Impossible de copier les objets": "Could not copy objects",
+        "Impossible de coller les objets": "Could not paste objects",
+        "Tous les objets sélectionnés": "All objects selected",
+        "Aucun objet à sélectionner": "No objects to select"
     })[text] : text;
-    statusText.textContent = translated || text;
+    const dynamicTranslation = FUZE_LANGUAGE === "en"
+        ? String(text)
+            .replace(/^(\d+) objets copiés$/, "$1 objects copied")
+            .replace(/^(\d+) objets collés$/, "$1 objects pasted")
+        : text;
+    statusText.textContent = translated || dynamicTranslation;
 }
 
 
