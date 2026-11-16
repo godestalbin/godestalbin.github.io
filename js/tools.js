@@ -227,16 +227,20 @@
         const width = getStrokeWidth();
         const strokeWidth = width;
 
-        // Cette forme noire est placée derrière l'image : celle-ci masque
-        // toute son ombre intérieure et ne laisse visible que l'ombre extérieure.
+        // Support opaque légèrement plus grand que l'image. L'image masque
+        // son centre ; le support restant forme la bordure sombre et son ombre
+        // est visible à l'extérieur, sur les quatre côtés.
         const shadowBacking = new fabric.Rect({
             left: bounds.left - strokeWidth,
             top: bounds.top - strokeWidth,
-            width: Math.max(1, bounds.width + strokeWidth),
-            height: Math.max(1, bounds.height + strokeWidth),
-            rx: Math.min(14, Math.max(4, Math.min(bounds.width, bounds.height) * 0.04)),
-            ry: Math.min(14, Math.max(4, Math.min(bounds.width, bounds.height) * 0.04)),
+            width: Math.max(1, bounds.width + strokeWidth * 2),
+            height: Math.max(1, bounds.height + strokeWidth * 2),
+            // Arrondir le support comme le contour, avec un rayon légèrement
+            // supérieur pour tenir compte de son débord extérieur.
+            rx: Math.min(14, Math.max(4, Math.min(bounds.width, bounds.height) * 0.04)) + strokeWidth,
+            ry: Math.min(14, Math.max(4, Math.min(bounds.width, bounds.height) * 0.04)) + strokeWidth,
             fill: "#000000",
+            stroke: null,
             strokeWidth: 0,
             shadow: makeOuterShapeShadow(),
             selectable: false,
@@ -257,6 +261,7 @@
             stroke: getColor(),
             strokeWidth: width,
             opacity: getStrokeOpacity(),
+            // L'ombre est portée par le support opaque placé derrière l'image.
             selectable: false,
             evented: false,
             objectCaching: false,
@@ -305,12 +310,15 @@
         border.setCoords();
         if (shadowBacking) {
             shadowBacking.set({
-                left: bounds.left - strokeWidth,
-                top: bounds.top - strokeWidth,
-                width: Math.max(1, bounds.width + strokeWidth),
-                height: Math.max(1, bounds.height + strokeWidth),
-                rx: radius,
-                ry: radius
+                // Conserver une marge identique sur les quatre côtés.
+                left: bounds.left - width,
+                top: bounds.top - width,
+                width: Math.max(1, bounds.width + width * 2),
+                height: Math.max(1, bounds.height + width * 2),
+                // Le support opaque doit avoir des angles arrondis pour ne pas
+                // laisser apparaître de coins noirs hors de la bordure.
+                rx: radius + width,
+                ry: radius + width
             });
             shadowBacking.setCoords();
         }
@@ -2700,7 +2708,11 @@
     // d'un déplacement : on bascule en Sélection au seuil de déplacement
     // et on déplace cet objet, sans démarrer un second tracé.
     let pendingObjectGesture = null;
+    let shapeDrawGesture = null;
     const OBJECT_DRAG_THRESHOLD = 4; // pixels écran
+    const DRAG_DRAW_TOOLS = new Set([
+        "rectangle", "circle", "highlight", "magnifier", "blur"
+    ]);
 
     canvas.on("mouse:down", event => {
         if (eyedropperActive) {
@@ -2769,6 +2781,15 @@
             return;
         }
 
+        if (DRAG_DRAW_TOOLS.has(currentTool)) {
+            shapeDrawGesture = {
+                clientX: event.e.clientX,
+                clientY: event.e.clientY,
+                target: event.target || null
+            };
+        } else {
+            shapeDrawGesture = null;
+        }
         startDrawing(event);
     });
 
@@ -2806,7 +2827,7 @@
         drawingMove(event);
     });
 
-    canvas.on("mouse:up", () => {
+    canvas.on("mouse:up", event => {
         if (pendingObjectGesture) {
             const gesture = pendingObjectGesture;
             pendingObjectGesture = null;
@@ -2830,6 +2851,41 @@
                 updateEmptyMessage();
             }
             return;
+        }
+
+        if (shapeDrawGesture) {
+            const gesture = shapeDrawGesture;
+            shapeDrawGesture = null;
+            const dx = (event?.e?.clientX ?? gesture.clientX) - gesture.clientX;
+            const dy = (event?.e?.clientY ?? gesture.clientY) - gesture.clientY;
+
+            // Rectangle, cercle, highlight, loupe et blur nécessitent un vrai
+            // glissement. Un clic seul annule l'aperçu et revient à la sélection.
+            if (Math.hypot(dx, dy) < OBJECT_DRAG_THRESHOLD) {
+                if (temporaryObject) canvas.remove(temporaryObject);
+                temporaryObject = null;
+                drawing = false;
+                drawStart = null;
+                rawDrawStart = null;
+                lastDrawingPoint = null;
+                freehandPoints = [];
+
+                const clickedObject = gesture.target &&
+                    canvas.getObjects().includes(gesture.target) &&
+                    gesture.target.fuzeTool !== "border" &&
+                    !gesture.target.fuzeBorderOwnerId &&
+                    gesture.target.fuzeMagnifierRole !== "connector"
+                    ? gesture.target
+                    : null;
+
+                setTool("select");
+                canvas.discardActiveObject();
+                if (clickedObject && clickedObject.selectable !== false) {
+                    canvas.setActiveObject(clickedObject);
+                }
+                canvas.requestRenderAll();
+                return;
+            }
         }
 
         finishDrawing();
