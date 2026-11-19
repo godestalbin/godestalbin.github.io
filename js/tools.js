@@ -515,6 +515,98 @@
     }
 
 
+    // Curseurs personnalisés des outils. Les coordonnées indiquent le point
+    // chaud (l'endroit exact du clic) dans chaque image PNG.
+    const TOOL_CURSORS = {
+        select: 'url("./cursors/select.png") 1 2, default',
+        text: 'url("./cursors/tool%20text.png") 10 44, text',
+        number: 'url("./cursors/tool%20number.png") 6 6, crosshair',
+        stamp: 'url("./cursors/tool%20stamp.png") 6 6, crosshair',
+        simpleArrow: 'url("./cursors/tool%20smart%20arrow.png") 6 6, crosshair',
+        arrow: 'url("./cursors/tool%20normal%20arrow.png") 6 6, crosshair',
+        rectangle: 'url("./cursors/tool%20rectangle.png") 6 6, crosshair',
+        circle: 'url("./cursors/tool%20circle.png") 6 6, crosshair',
+        felt: 'url("./cursors/tool%20felt.png") 6 6, crosshair',
+        highlight: 'url("./cursors/tool%20hightlight.png") 6 6, crosshair',
+        blur: 'url("./cursors/tool%20blur.png") 6 6, crosshair',
+        magnifier: 'url("./cursors/tool%20zoom.png") 6 6, crosshair'
+    };
+    const DEFAULT_TOOL_CURSOR = 'url("./cursors/tool%20default.png") 6 6, crosshair';
+    const MOVE_CURSOR = 'url("./cursors/move.png") 23 23, default';
+    let objectMoveCursorActive = false;
+    let objectMoveCursorFrame = 0;
+
+    // Fabric peut réappliquer son hoverCursor après avoir émis mouse:down ou
+    // mouse:move. Réappliquer notre curseur à la frame suivante garantit que
+    // le curseur de déplacement reste prioritaire pendant le bouton maintenu.
+    function scheduleObjectMoveCursorUpdate() {
+        if (objectMoveCursorFrame) cancelAnimationFrame(objectMoveCursorFrame);
+        objectMoveCursorFrame = requestAnimationFrame(() => {
+            objectMoveCursorFrame = 0;
+            if (objectMoveCursorActive) updateToolCursor();
+        });
+    }
+
+    function updateToolCursor(target = null) {
+        if (!canvas?.upperCanvasEl) return;
+        const cursorElement = canvas.upperCanvasEl;
+
+        // La pipette garde toujours la priorité sur les curseurs des outils.
+        if (eyedropperActive) {
+            updateEyedropperCursor();
+            return;
+        }
+
+        // L'outil Bordure conserve le curseur natif : aucun curseur dédié.
+        if (currentTool === "border") {
+            cursorElement.style.cursor = "";
+            return;
+        }
+
+        // Le curseur de déplacement n'est affiché que pendant un geste
+        // commencé sur un objet déplaçable, jamais au simple survol.
+        if (objectMoveCursorActive) {
+            cursorElement.style.cursor = MOVE_CURSOR;
+            return;
+        }
+
+        cursorElement.style.cursor = TOOL_CURSORS[currentTool] || DEFAULT_TOOL_CURSOR;
+    }
+
+
+    // Chrome peut conserver le curseur système après la fermeture d'une
+    // boîte de dialogue native (notamment lorsque l'utilisateur appuie sur
+    // Échap). Une simple réaffectation de la même URL CSS ne suffit pas :
+    // il faut passer brièvement par un autre curseur, puis réappliquer celui
+    // correspondant à l'outil actuellement actif.
+    let fuzeWindowLostFocus = false;
+
+    window.addEventListener("blur", () => {
+        fuzeWindowLostFocus = true;
+    });
+
+    window.addEventListener("focus", () => {
+        if (!fuzeWindowLostFocus) return;
+        fuzeWindowLostFocus = false;
+
+        requestAnimationFrame(() => {
+            const cursorElement = canvas?.upperCanvasEl;
+            if (!cursorElement) return;
+
+            // Première étape : imposer un changement réel de curseur.
+            cursorElement.style.cursor = "default";
+            void cursorElement.offsetWidth;
+
+            // Deuxième étape : restaurer le curseur calculé à partir de l'état
+            // courant de Fuze (outil, pipette ou outil Bordure).
+            window.setTimeout(() => {
+                if (!cursorElement.isConnected) return;
+                updateToolCursor();
+                void cursorElement.offsetWidth;
+            }, 100);
+        });
+    });
+
     function setTool(tool) {
 
         // Tout changement d'outil (menu ou raccourci clavier) quitte la pipette.
@@ -592,6 +684,7 @@
 
         syncThicknessControl();
         canvas.renderAll();
+        updateToolCursor();
         if (tool === "stamp") openStampDialog();
     }
 
@@ -2794,6 +2887,10 @@
     });
 
     canvas.on("mouse:move", event => {
+        // En mode Sélection, Fabric peut réécrire le curseur de survol pendant
+        // que le bouton reste enfoncé. Notre curseur move doit rester affiché.
+        if (objectMoveCursorActive) scheduleObjectMoveCursorUpdate();
+
         if (pendingObjectGesture) {
             const gesture = pendingObjectGesture;
             const dxScreen = event.e.clientX - gesture.clientX;
@@ -2801,7 +2898,10 @@
 
             if (!gesture.moved && Math.hypot(dxScreen, dyScreen) >= OBJECT_DRAG_THRESHOLD) {
                 gesture.moved = true;
+                objectMoveCursorActive = true;
                 setTool("select");
+                updateToolCursor();
+                scheduleObjectMoveCursorUpdate();
                 if (canvas.getObjects().includes(gesture.target)) {
                     canvas.setActiveObject(gesture.target);
                 }
@@ -2828,6 +2928,13 @@
     });
 
     canvas.on("mouse:up", event => {
+        objectMoveCursorActive = false;
+        if (objectMoveCursorFrame) {
+            cancelAnimationFrame(objectMoveCursorFrame);
+            objectMoveCursorFrame = 0;
+        }
+        updateToolCursor(event?.target || null);
+
         if (pendingObjectGesture) {
             const gesture = pendingObjectGesture;
             pendingObjectGesture = null;
@@ -2891,18 +2998,76 @@
         finishDrawing();
     });
 
-    // Fabric peut rétablir son curseur de sélection.
-    // Tant que la pipette est active, on lui redonne la priorité.
-    canvas.on("mouse:move", () => {
-        if (eyedropperActive) {
-            updateEyedropperCursor();
+    // Gestion du curseur move en mode Sélection via les événements DOM natifs.
+    // Les événements Fabric mouse:down/mouse:move ne sont pas toujours suffisants :
+    // Fabric peut réécrire le curseur après leur émission. Le pointerdown en phase
+    // capture identifie la cible avant le traitement Fabric, puis la restauration
+    // est réappliquée après celui-ci.
+    function isMoveCursorTarget(target) {
+        return !!target &&
+            target.selectable !== false &&
+            target.evented !== false &&
+            target.fuzeTool !== "border" &&
+            !target.fuzeBorderOwnerId &&
+            target.fuzeMagnifierRole !== "connector";
+    }
+
+    const moveCursorCanvasElement = canvas.upperCanvasEl;
+
+    moveCursorCanvasElement.addEventListener("pointerdown", event => {
+        if (currentTool !== "select" || event.button !== 0) return;
+
+        const target = canvas.findTarget(event);
+        if (!isMoveCursorTarget(target)) return;
+
+        objectMoveCursorActive = true;
+        updateToolCursor();
+
+        // Laisser Fabric terminer son traitement du pointerdown avant de
+        // réimposer le curseur personnalisé.
+        window.setTimeout(() => {
+            if (objectMoveCursorActive && event.buttons !== 0) {
+                updateToolCursor();
+            }
+        }, 0);
+    }, true);
+
+    moveCursorCanvasElement.addEventListener("pointermove", event => {
+        if (!objectMoveCursorActive || !(event.buttons & 1)) return;
+
+        requestAnimationFrame(() => {
+            if (objectMoveCursorActive) {
+                moveCursorCanvasElement.style.cursor = MOVE_CURSOR;
+            }
+        });
+    }, true);
+
+    function endObjectMoveCursor() {
+        objectMoveCursorActive = false;
+        if (objectMoveCursorFrame) {
+            cancelAnimationFrame(objectMoveCursorFrame);
+            objectMoveCursorFrame = 0;
         }
+        updateToolCursor();
+    }
+
+    // pointerup est capturé avant Fabric ; différer la restauration pour qu'elle
+    // intervienne après le dernier traitement de curseur de Fabric.
+    window.addEventListener("pointerup", () => {
+        window.setTimeout(endObjectMoveCursor, 0);
+    }, true);
+    window.addEventListener("pointercancel", endObjectMoveCursor, true);
+    window.addEventListener("blur", endObjectMoveCursor);
+
+    // Fabric peut rétablir son curseur au survol. On réapplique le curseur
+    // de l'outil après son traitement ; le curseur move est réservé aux gestes
+    // de déplacement réellement engagés.
+    canvas.on("mouse:move", event => {
+        updateToolCursor(event?.target || null);
     });
 
-    canvas.on("mouse:over", () => {
-        if (eyedropperActive) {
-            updateEyedropperCursor();
-        }
+    canvas.on("mouse:over", event => {
+        updateToolCursor(event?.target || null);
     });
 
     // Réévaluer le tracé et les poignées dès que Ctrl, Shift ou Alt change,
@@ -3085,6 +3250,10 @@
                     left:
                         pointer.x,
 
+                    // On utilise l'origine haute et on recalcule explicitement
+                    // le haut à partir de la hauteur réelle du texte après sa
+                    // construction. Cela évite les écarts liés aux métriques
+                    // internes de Fabric selon la taille de police.
                     top:
                         pointer.y,
 
@@ -3170,6 +3339,22 @@
                 }
             );
 
+
+        /* =================================================
+        ANCRAGE SUR LE POINT CHAUD DU CURSEUR
+        ================================================= */
+
+        // Le coin inférieur gauche de la boîte du texte doit rester exactement
+        // au point cliqué, quelle que soit la taille de police.
+        // On le calcule après construction, lorsque Fabric a calculé text.height.
+        text.initDimensions();
+        text.set({
+            left: pointer.x,
+            top: pointer.y - text.height,
+            originX: "left",
+            originY: "top"
+        });
+        text.setCoords();
 
         /* =================================================
         AJOUT

@@ -555,12 +555,22 @@ document.addEventListener("keydown", event => {
 
     const target = event.target;
 
-    if (
+    // Les contrôles du bandeau (taille image, couleur, épaisseur,
+    // transparence, taille du texte et zoom) peuvent conserver le focus
+    // après leur utilisation. Ils ne doivent pas bloquer les raccourcis Fuze.
+    // En revanche, on continue d'ignorer les véritables champs de saisie
+    // situés ailleurs dans l'interface.
+    const isFormField =
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
         target instanceof HTMLSelectElement ||
-        target.isContentEditable
-    ) {
+        target.isContentEditable;
+
+    const isToolbarControl = Boolean(
+        target.closest && target.closest(".toolbar")
+    );
+
+    if (isFormField && !isToolbarControl) {
         return;
     }
 
