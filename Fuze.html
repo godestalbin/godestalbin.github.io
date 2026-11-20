@@ -78,6 +78,8 @@
 <script src="js/main.js" defer></script>
 <script src="js/help.js" defer></script>
 
+<script src='https://storage.ko-fi.com/cdn/scripts/overlay-widget.js'></script>
+
 </head>
 
 <body>
@@ -330,6 +332,29 @@
     </span>
 
 </div>
+<style>
+/* Ko-fi floating button */
+.floatingchat-container-wrap {
+    top: 15px !important;
+    left: 15px !important;
+    bottom: auto !important;
+    right: auto !important;
+}
 
+/* Ko-fi popup */
+.floating-chat-kofi-popup-iframe {
+    top: 75px !important;
+    left: 15px !important;
+    bottom: auto !important;
+    right: auto !important;
+}</style>
+<script>
+  kofiWidgetOverlay.draw('fuzze', {
+    'type': 'floating-chat',
+    'floating-chat.donateButton.text': 'Support me',
+    'floating-chat.donateButton.background-color': '#00b9fe',
+    'floating-chat.donateButton.text-color': '#fff'
+  });
+</script>
 </body>
 </html>
