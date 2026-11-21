@@ -58,6 +58,14 @@ function saveHistory() {
     const state =
         serializeCanvas();
 
+    // Plusieurs gestionnaires peuvent signaler la même action Fabric
+    // (par exemple object:moved puis object:modified). Ne conserver qu’un
+    // instantané si le contenu du canvas n’a pas réellement changé.
+    if (historyIndex >= 0 && history[historyIndex] === state) {
+        updateUndoRedoButtons();
+        return;
+    }
+
     if (
         historyIndex <
         history.length - 1

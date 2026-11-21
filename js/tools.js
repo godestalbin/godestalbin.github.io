@@ -515,15 +515,18 @@
     }
 
 
-    // Curseurs personnalisés des outils. Les coordonnées indiquent le point
-    // chaud (l'endroit exact du clic) dans chaque image PNG.
+    // Curseurs personnalisés des outils. Le hotspot des deux curseurs de
+    // flèche reste fixé à (6, 6), au centre de la croix dessinée dans l'image.
+    const ARROW_TOOL_CURSORS = {
+        simpleArrow: 'url("./cursors/tool%20normal%20arrow.png") 6 6, crosshair',
+        arrow: 'url("./cursors/tool%20smart%20arrow.png") 6 6, crosshair'
+    };
+
     const TOOL_CURSORS = {
         select: 'url("./cursors/select.png") 1 2, default',
         text: 'url("./cursors/tool%20text.png") 10 44, text',
         number: 'url("./cursors/tool%20number.png") 6 6, crosshair',
         stamp: 'url("./cursors/tool%20stamp.png") 6 6, crosshair',
-        simpleArrow: 'url("./cursors/tool%20smart%20arrow.png") 6 6, crosshair',
-        arrow: 'url("./cursors/tool%20normal%20arrow.png") 6 6, crosshair',
         rectangle: 'url("./cursors/tool%20rectangle.png") 6 6, crosshair',
         circle: 'url("./cursors/tool%20circle.png") 6 6, crosshair',
         felt: 'url("./cursors/tool%20felt.png") 6 6, crosshair',
@@ -533,6 +536,22 @@
     };
     const DEFAULT_TOOL_CURSOR = 'url("./cursors/tool%20default.png") 6 6, crosshair';
     const MOVE_CURSOR = 'url("./cursors/move.png") 23 23, default';
+
+    // Pour les flèches, calcule le point de scène à partir de la même
+    // origine écran que celle utilisée par positionArrowHandles().
+    // Cela garantit que le point d'ancrage (et donc la poignée) tombe
+    // exactement sous le hotspot CSS du curseur, fixé à (6, 6).
+    // On limite cette conversion aux flèches : les autres outils et le
+    // déplacement des poignées conservent leur comportement existant.
+    function getArrowScenePointFromPointer(event) {
+        const rect = canvas.upperCanvasEl.getBoundingClientRect();
+        const viewportPoint = new fabric.Point(
+            event.clientX - rect.left,
+            event.clientY - rect.top
+        );
+        const inverseViewport = fabric.util.invertTransform(canvas.viewportTransform);
+        return fabric.util.transformPoint(viewportPoint, inverseViewport);
+    }
     let objectMoveCursorActive = false;
     let objectMoveCursorFrame = 0;
 
@@ -544,6 +563,32 @@
         objectMoveCursorFrame = requestAnimationFrame(() => {
             objectMoveCursorFrame = 0;
             if (objectMoveCursorActive) updateToolCursor();
+        });
+    }
+
+    let toolCursorRefreshFrame = 0;
+
+    // Après un raccourci clavier, Chrome peut conserver visuellement l'ancien
+    // curseur jusqu'au prochain mouvement de souris, même si la propriété CSS
+    // a changé. Forcer un vrai changement de style puis réappliquer le curseur
+    // du nouvel outil à la frame suivante évite cette dépendance au mousemove.
+    function refreshToolCursorAfterToolChange() {
+        const cursorElement = canvas?.upperCanvasEl;
+        if (!cursorElement) return;
+
+        if (toolCursorRefreshFrame) {
+            cancelAnimationFrame(toolCursorRefreshFrame);
+            toolCursorRefreshFrame = 0;
+        }
+
+        cursorElement.style.cursor = "default";
+        void cursorElement.offsetWidth;
+
+        toolCursorRefreshFrame = requestAnimationFrame(() => {
+            toolCursorRefreshFrame = 0;
+            if (!cursorElement.isConnected || cursorElement !== canvas?.upperCanvasEl) return;
+            updateToolCursor();
+            void cursorElement.offsetWidth;
         });
     }
 
@@ -570,7 +615,10 @@
             return;
         }
 
-        cursorElement.style.cursor = TOOL_CURSORS[currentTool] || DEFAULT_TOOL_CURSOR;
+        cursorElement.style.cursor =
+            ARROW_TOOL_CURSORS[currentTool] ||
+            TOOL_CURSORS[currentTool] ||
+            DEFAULT_TOOL_CURSOR;
     }
 
 
@@ -631,7 +679,11 @@
 
         canvas.isDrawingMode = false;
 
-        if (Object.prototype.hasOwnProperty.call(DEFAULT_STROKE_WIDTHS, tool)) {
+        // Rectangle et cercle conservent l'épaisseur actuellement choisie.
+        // Seul le feutre garde son épaisseur initiale dédiée (10 px) lorsqu'on
+        // sélectionne cet outil ; sélectionner R ou C ne réinitialise jamais
+        // le réglage partagé.
+        if (tool === "felt" && Object.prototype.hasOwnProperty.call(DEFAULT_STROKE_WIDTHS, tool)) {
             strokeWidthInput.value = String(DEFAULT_STROKE_WIDTHS[tool]);
         }
 
@@ -684,7 +736,7 @@
 
         syncThicknessControl();
         canvas.renderAll();
-        updateToolCursor();
+        refreshToolCursorAfterToolChange();
         if (tool === "stamp") openStampDialog();
     }
 
@@ -1022,7 +1074,6 @@
                 tailWidth / 2
         });
 
-
         return points;
     }
 
@@ -1313,6 +1364,93 @@
             return null;
         }
 
+        const tipRadius = Math.min(strokeWidth * 3.8, 50);
+
+        // Le sommet du polygone est le point de contrôle de l'arrondi :
+        // la courbe quadratique ne passe donc pas directement par ce sommet.
+        // On résout la position de ce point de contrôle pour que le point le
+        // plus avancé de la courbe, contour blanc compris, tombe exactement
+        // sur x2/y2 (l'ancrage de la poignée).
+        // Cette résolution reprend strictement le même calcul de tangentes et
+        // le même plafonnement de rayon que roundedPolygonPath().
+        const tip = points[3];
+        const previousTipPoint = points[2];
+        const nextTipPoint = points[4];
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const length = Math.hypot(dx, dy);
+
+        if (length > 0.001) {
+            const ux = dx / length;
+            const uy = dy / length;
+            const originalTip = { x: tip.x, y: tip.y };
+            const targetCurvePoint = {
+                x: x2 - ux * widths.outlineWidth / 2,
+                y: y2 - uy * widths.outlineWidth / 2
+            };
+
+            // Retourne le milieu exact de la courbe quadratique de l'arrondi
+            // de la pointe : Q(0.5) = (A + 2P + B) / 4.
+            function getTipCurveMidpoint(controlX, controlY) {
+                const v1x = previousTipPoint.x - controlX;
+                const v1y = previousTipPoint.y - controlY;
+                const v2x = nextTipPoint.x - controlX;
+                const v2y = nextTipPoint.y - controlY;
+                const len1 = Math.hypot(v1x, v1y);
+                const len2 = Math.hypot(v2x, v2y);
+
+                if (len1 < 0.001 || len2 < 0.001) {
+                    return { x: controlX, y: controlY };
+                }
+
+                const radius = Math.min(
+                    tipRadius,
+                    Math.min(len1, len2) * 0.45
+                );
+                const beforeX = controlX + (v1x / len1) * radius;
+                const beforeY = controlY + (v1y / len1) * radius;
+                const afterX = controlX + (v2x / len2) * radius;
+                const afterY = controlY + (v2y / len2) * radius;
+
+                return {
+                    x: (beforeX + 2 * controlX + afterX) / 4,
+                    y: (beforeY + 2 * controlY + afterY) / 4
+                };
+            }
+
+            // La géométrie est symétrique autour de l'axe de la flèche :
+            // seul le déplacement du contrôle sur cet axe est nécessaire.
+            // Newton avec dérivée numérique converge en quelques itérations.
+            const getAxialError = (offset) => {
+                const midpoint = getTipCurveMidpoint(
+                    originalTip.x + ux * offset,
+                    originalTip.y + uy * offset
+                );
+                return (midpoint.x - targetCurvePoint.x) * ux +
+                    (midpoint.y - targetCurvePoint.y) * uy;
+            };
+
+            let offset = 0;
+            for (let i = 0; i < 12; i++) {
+                const error = getAxialError(offset);
+                if (Math.abs(error) < 0.0001) break;
+
+                const epsilon = 0.01;
+                const derivative = (
+                    getAxialError(offset + epsilon) -
+                    getAxialError(offset - epsilon)
+                ) / (2 * epsilon);
+
+                if (!Number.isFinite(derivative) || Math.abs(derivative) < 0.000001) {
+                    break;
+                }
+
+                offset -= error / derivative;
+            }
+
+            tip.x = originalTip.x + ux * offset;
+            tip.y = originalTip.y + uy * offset;
+        }
 
         /*
         Le padding inclut le contour blanc
@@ -1383,13 +1521,6 @@
                 28
             );
 
-        const tipRadius =
-            Math.min(
-                strokeWidth * 3.8,
-                50
-            );
-
-
         const pathData =
             roundedPolygonPath(
                 localPoints,
@@ -1401,6 +1532,12 @@
         return {
             pathData,
             bounds,
+            // The SVG path's actual local bounding box starts at `padding`,
+            // not at (0, 0). Fabric's left/top refer to that actual path
+            // bounding box. Keep the scene origin aligned with the original
+            // polygon coordinates rather than with the padded coordinate box.
+            pathLeft: bounds.minX + padding,
+            pathTop: bounds.minY + padding,
             widths,
             radius,
             tipRadius
@@ -1440,6 +1577,8 @@
         const {
             pathData,
             bounds,
+            pathLeft,
+            pathTop,
             widths
         } = geometry;
 
@@ -1478,10 +1617,10 @@
                 {
 
                     left:
-                        bounds.minX,
+                        pathLeft,
 
                     top:
-                        bounds.minY,
+                        pathTop,
 
                     originX: "left",
                     originY: "top",
@@ -1586,16 +1725,18 @@
         const headLength = Math.min(length * 0.48, Math.max(18, strokeWidth * 4.2));
         const baseX = x2 - ux * headLength;
         const baseY = y2 - uy * headLength;
+        const outlineWidth = Math.max(2, strokeWidth * 0.4);
+        const visibleTipX = x2 - ux * outlineWidth / 2;
+        const visibleTipY = y2 - uy * outlineWidth / 2;
         const points = [
             { x: x1 + px * shaft / 2, y: y1 + py * shaft / 2 },
             { x: baseX + px * shaft / 2, y: baseY + py * shaft / 2 },
             { x: baseX + px * headWidth / 2, y: baseY + py * headWidth / 2 },
-            { x: x2, y: y2 },
+            { x: visibleTipX, y: visibleTipY },
             { x: baseX - px * headWidth / 2, y: baseY - py * headWidth / 2 },
             { x: baseX - px * shaft / 2, y: baseY - py * shaft / 2 },
             { x: x1 - px * shaft / 2, y: y1 - py * shaft / 2 }
         ];
-        const outlineWidth = Math.max(2, strokeWidth * 0.4);
         const shadedContour = Math.max(5.5, strokeWidth * 0.88);
         const padding = outlineWidth + shadedContour * 3 + 3;
         const minX = Math.min(...points.map(point => point.x)) - padding;
@@ -1606,6 +1747,10 @@
             pathData,
             minX,
             minY,
+            // The path coordinates begin at `padding`; Fabric positions
+            // left/top at the actual path bounds, not at the padded origin.
+            pathLeft: minX + padding,
+            pathTop: minY + padding,
             outlineWidth,
             shadedContour,
             localStart: { x: x1 - minX, y: y1 - minY },
@@ -1618,13 +1763,13 @@
         if (!geometry) return null;
 
         const {
-            pathData, minX, minY, outlineWidth, shadedContour,
+            pathData, pathLeft, pathTop, outlineWidth, shadedContour,
             localStart, localEnd
         } = geometry;
 
         return new fabric.Path(pathData, {
-            left: minX,
-            top: minY,
+            left: pathLeft,
+            top: pathTop,
             originX: "left",
             originY: "top",
             fill: color,
@@ -2268,9 +2413,9 @@
 
 
         const pointer =
-            canvas.getScenePoint(
-                event.e
-            );
+            (currentTool === "arrow" || currentTool === "simpleArrow")
+                ? getArrowScenePointFromPointer(event.e)
+                : canvas.getScenePoint(event.e);
 
 
         drawing = true;
@@ -2575,7 +2720,10 @@
     function drawingMove(event) {
         if (!drawing || !temporaryObject) return;
 
-        const pointer = canvas.getScenePoint(event.e);
+        const pointer =
+            (currentTool === "arrow" || currentTool === "simpleArrow")
+                ? getArrowScenePointFromPointer(event.e)
+                : canvas.getScenePoint(event.e);
         const point = { x: pointer.x, y: pointer.y };
         lastDrawingPoint = point;
 

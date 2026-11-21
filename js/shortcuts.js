@@ -1,3 +1,21 @@
+/* =====================================================
+   FERMETURE DES MENUS AVEC ÉCHAP
+===================================================== */
+// Capture l'événement avant les autres gestionnaires Escape (outils, pipette, etc.)
+// afin que la fermeture d'un menu ne déclenche pas une seconde action.
+document.addEventListener("keydown", event => {
+    if (event.key !== "Escape") return;
+
+    const openMenus = document.querySelectorAll(".toolbar-menu[open]");
+    if (!openMenus.length) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    openMenus.forEach(menu => {
+        menu.open = false;
+    });
+}, true);
+
 
 /* ===== Extracted from original script.js, lines 5008-5157 ===== */
 /* =====================================================
@@ -221,6 +239,14 @@ document
             "click",
             () => {
 
+                // Bordure est une action ponctuelle sur l'image sélectionnée,
+                // pas un outil de dessin à activer.
+                if (button.dataset.tool === "border") {
+                    addBorderToSelectedImage();
+                    document.querySelectorAll(".toolbar-menu").forEach(menu => menu.removeAttribute("open"));
+                    return;
+                }
+
                 setTool(
                     button.dataset.tool
                 );
@@ -259,6 +285,7 @@ document
 
 let fuzeObjectClipboard = null;
 let fuzePasteCount = 0;
+window.__fuzeHasObjectClipboard = () => !!fuzeObjectClipboard?.length;
 
 function getClipboardSourceObjects() {
     const active = canvas.getActiveObject();
@@ -418,22 +445,22 @@ function deleteSelectedObjects() {
     const allObjects = canvas.getObjects();
     const toDelete = new Set(selected);
 
-    // Supprimer également la bordure liée à une image sélectionnée.
+    // Supprimer l'image, sa bordure et le support noir qui porte son ombre.
+    // Ces trois objets forment un seul élément logique dans Fuze.
+    const borderIds = new Set();
     selected.forEach(object => {
-        if (object.fuzeBorderId) {
-            const border = allObjects.find(
-                item => item.fuzeBorderOwnerId === object.fuzeBorderId
-            );
-            if (border) toDelete.add(border);
-        }
-        // Si seule la bordure est sélectionnée, supprimer aussi son image
-        // pour conserver le comportement d'objet composé.
-        if (object.fuzeBorderOwnerId) {
-            const image = allObjects.find(
-                item => item.fuzeBorderId === object.fuzeBorderOwnerId
-            );
-            if (image) toDelete.add(image);
-        }
+        if (object.fuzeBorderId) borderIds.add(object.fuzeBorderId);
+        if (object.fuzeBorderOwnerId) borderIds.add(object.fuzeBorderOwnerId);
+        if (object.fuzeBorderShadowOwnerId) borderIds.add(object.fuzeBorderShadowOwnerId);
+    });
+
+    borderIds.forEach(borderId => {
+        const image = allObjects.find(item => item.fuzeBorderId === borderId);
+        const border = allObjects.find(item => item.fuzeBorderOwnerId === borderId);
+        const shadowBacking = allObjects.find(item => item.fuzeBorderShadowOwnerId === borderId);
+        if (image) toDelete.add(image);
+        if (border) toDelete.add(border);
+        if (shadowBacking) toDelete.add(shadowBacking);
     });
 
     canvas.discardActiveObject();
@@ -574,6 +601,17 @@ document.addEventListener("keydown", event => {
         return;
     }
 
+    // Backspace est réservé à l'édition du contenu des champs (notamment
+    // les contrôles numériques du bandeau). Il ne supprime jamais un objet.
+    // Hors d'un champ, on neutralise aussi Backspace pour éviter la
+    // navigation arrière du navigateur.
+    if (event.key === "Backspace") {
+        if (!isFormField) {
+            event.preventDefault();
+        }
+        return;
+    }
+
 
     /* =================================================
        RACCOURCIS FUZE
@@ -638,13 +676,9 @@ document.addEventListener("keydown", event => {
         }
     }
 
-    if (event.ctrlKey && !event.altKey && !event.metaKey && key === "v") {
-        if (!(editingText && editingText.isEditing) && fuzeObjectClipboard?.length) {
-            event.preventDefault();
-            pasteCopiedObjects();
-            return;
-        }
-    }
+    // Ctrl+V est traité dans l'événement "paste" (files.js), afin de
+    // pouvoir examiner le vrai presse-papiers système avant le presse-papiers
+    // interne Fuze. Une image copiée depuis Chrome doit être prioritaire.
 
     // Ouvrir / enregistrer un document Fuze.
     if (event.ctrlKey && event.shiftKey && !event.altKey && key === "o") {
@@ -734,10 +768,9 @@ document.addEventListener("keydown", event => {
        SUPPRESSION
     ================================================= */
 
-    if (
-        event.key === "Delete" ||
-        event.key === "Backspace"
-    ) {
+    // La suppression d'un objet se fait avec Delete uniquement.
+    // Backspace reste disponible pour corriger les valeurs des champs.
+    if (event.key === "Delete") {
         if (canvas.getActiveObject()) {
             event.preventDefault();
             deleteSelectedObjects();

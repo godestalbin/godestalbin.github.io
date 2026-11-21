@@ -505,7 +505,8 @@ document.addEventListener("paste", async (event) => {
 
     for (const item of items) {
 
-        // On ne traite que les images
+        // Priorité au presse-papiers système : une image copiée depuis
+        // Chrome doit passer avant les objets précédemment copiés dans Fuze.
         if (!item.type.startsWith("image/")) {
             continue;
         }
@@ -575,6 +576,15 @@ document.addEventListener("paste", async (event) => {
         }
 
         // Une seule image par collage
-        break;
+        return;
+    }
+
+    // Aucun contenu image dans le presse-papiers système : on conserve
+    // alors le collage des objets copiés à l'intérieur de Fuze.
+    if (!(editingText && editingText.isEditing) &&
+        typeof pasteCopiedObjects === "function" &&
+        window.__fuzeHasObjectClipboard?.()) {
+        event.preventDefault();
+        pasteCopiedObjects();
     }
 });
