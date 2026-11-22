@@ -311,6 +311,15 @@
         display: block;
     }
 
+    .arrow-handle-control {
+        border-color: var(--pine);
+        background: #f3f7ed;
+        width: 16px;
+        height: 16px;
+        margin-left: -8px;
+        margin-top: -8px;
+    }
+
     .arrow-handle:hover {
         transform: scale(1.15);
     }

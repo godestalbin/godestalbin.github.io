@@ -749,6 +749,7 @@ document.addEventListener("keydown", event => {
             t: "text",
             n: "number",
             a: "arrow",
+            q: "curvedArrow",
             r: "rectangle",
             c: "circle",
             f: "felt",

@@ -96,3 +96,6 @@ const arrowHandleStart =
 const arrowHandleEnd =
     document.getElementById("arrowHandleEnd");
 
+const arrowHandleControl =
+    document.getElementById("arrowHandleControl");
+

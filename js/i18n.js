@@ -14,7 +14,7 @@ const FUZE_I18N = {
         file: "Fichier", edit: "Édition", openFuze: "Ouvrir Fuze", saveFuze: "Enregistrer Fuze", help: "Aide", helpFeatures: "Aide et fonctionnalités", openImage: "Ouvrir une image",
         copyAnnotated: "Copier l’image annotée", savePng: "Enregistrer en PNG",
         clearPanel: "Effacer le canvas", select: "Sélection", text: "Texte", number: "Numéro",
-        arrow: "Flèche", simpleArrow: "Flèche simple", rectangle: "Rectangle", circle: "Cercle", felt: "Feutre",
+        arrow: "Flèche", simpleArrow: "Flèche simple", curvedArrow: "Flèche courbe", rectangle: "Rectangle", circle: "Cercle", felt: "Feutre",
         highlight: "Highlight", imageSize: "Taille image",
         highlight: "Highlight", blur: "Brouillage", magnifier: "Zoom", border: "Bordure", imageSize: "Taille image",
         color: "Couleur", thickness: "Épaisseur", transparency: "Transparence",
@@ -25,14 +25,14 @@ const FUZE_I18N = {
         eyedropper: "Pipette", thicknessTitle: "Épaisseur du trait", thicknessAria: "Épaisseur",
         transparencyTitle: "Transparence du surlignage", transparencyAria: "Transparence",
         textSizeTitle: "Taille du texte", zoomTitle: "Niveau de zoom",
-        arrowStart: "Début de la flèche", arrowEnd: "Pointe de la flèche",
+        arrowStart: "Début de la flèche", arrowEnd: "Pointe de la flèche", arrowCurve: "Courbure de la flèche",
         addImage: "Ajoutez une image pour commencer", ready: "Prêt"
     },
     en: {
         file: "File", edit: "Edit", openFuze: "Open Fuze", saveFuze: "Save Fuze", help: "Help", helpFeatures: "Help & features", openImage: "Open image",
         copyAnnotated: "Copy annotated image", savePng: "Save as PNG",
         clearPanel: "Clear canvas", select: "Select", text: "Text", number: "Number",
-        arrow: "Arrow", simpleArrow: "Simple arrow", rectangle: "Rectangle", circle: "Circle", felt: "Felt",
+        arrow: "Arrow", simpleArrow: "Simple arrow", curvedArrow: "Curved arrow", rectangle: "Rectangle", circle: "Circle", felt: "Felt",
         highlight: "Highlight", border: "Border", imageSize: "Image size",
         highlight: "Highlight", blur: "Blur", magnifier: "Zoom", imageSize: "Image size",
         color: "Color", thickness: "Thickness", transparency: "Transparency",
@@ -43,7 +43,7 @@ const FUZE_I18N = {
         eyedropper: "Eyedropper", thicknessTitle: "Stroke thickness", thicknessAria: "Thickness",
         transparencyTitle: "Highlight transparency", transparencyAria: "Transparency",
         textSizeTitle: "Text size", zoomTitle: "Zoom level",
-        arrowStart: "Arrow start", arrowEnd: "Arrow tip",
+        arrowStart: "Arrow start", arrowEnd: "Arrow tip", arrowCurve: "Arrow curve",
         addImage: "Add an image to get started", ready: "Ready"
     }
 };
@@ -73,7 +73,7 @@ function applyFuzeLanguage() {
         ['[data-action="save-png"]', 'savePng'],
         ['[data-action="clear-panel"]', 'clearPanel'],
         ['[data-tool="select"]', 'select'], ['[data-tool="text"]', 'text'], ['[data-tool="number"]', 'number'],
-        ['[data-tool="arrow"]', 'arrow'], ['[data-tool="simpleArrow"]', 'simpleArrow'], ['[data-tool="rectangle"]', 'rectangle'],
+        ['[data-tool="arrow"]', 'arrow'], ['[data-tool="simpleArrow"]', 'simpleArrow'], ['[data-tool="curvedArrow"]', 'curvedArrow'], ['[data-tool="rectangle"]', 'rectangle'],
         ['[data-tool="circle"]', 'circle'], ['[data-tool="felt"]', 'felt'],
         ['[data-tool="highlight"]', 'highlight'],
         ['[data-tool="blur"]', 'blur'], ['[data-tool="magnifier"]', 'magnifier'], ['[data-tool="border"]', 'border']
@@ -119,8 +119,10 @@ function applyFuzeLanguage() {
     if (zoomSelect) zoomSelect.setAttribute('aria-label', fuzeT('zoomTitle'));
     const start = document.getElementById('arrowHandleStart');
     const end = document.getElementById('arrowHandleEnd');
+    const control = document.getElementById('arrowHandleControl');
     if (start) start.title = fuzeT('arrowStart');
     if (end) end.title = fuzeT('arrowEnd');
+    if (control) control.title = fuzeT('arrowCurve');
     const empty = document.getElementById('emptyMessage');
     if (empty) empty.textContent = fuzeT('addImage');
     const initialStatus = document.getElementById('statusText');

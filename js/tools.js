@@ -26,7 +26,7 @@
     }
 
     function getObjectThickness(object) {
-        if (isEditableArrow(object)) return Number(object.arrowStrokeWidth ?? object.strokeWidth);
+        if (isEditableArrow(object) || object.arrowType === "curved") return Number(object.arrowStrokeWidth ?? object.strokeWidth);
         return Number(object.strokeWidth);
     }
 
@@ -519,6 +519,7 @@
     // flèche reste fixé à (6, 6), au centre de la croix dessinée dans l'image.
     const ARROW_TOOL_CURSORS = {
         simpleArrow: 'url("./cursors/tool%20normal%20arrow.png") 6 6, crosshair',
+        curvedArrow: 'url("./cursors/tool%20curve%20arrow.png") 6 6, crosshair',
         arrow: 'url("./cursors/tool%20smart%20arrow.png") 6 6, crosshair'
     };
 
@@ -663,6 +664,16 @@
         if (eyedropperActive) {
             cancelEyedropper();
             updateEyedropperCursor();
+        }
+
+        if (currentTool === "curvedArrow" && tool !== "curvedArrow") {
+            if (temporaryObject) canvas.remove(temporaryObject);
+            temporaryObject = null;
+            drawing = false;
+            rawDrawStart = null;
+            curvedArrowStage = 0;
+            curvedArrowStart = curvedArrowEnd = curvedArrowControl = null;
+            canvas.requestRenderAll();
         }
 
         currentTool = tool;
@@ -819,7 +830,7 @@
     }
 
     function isEditableArrow(object) {
-        return isFancyArrow(object) || isSimpleArrow(object);
+        return isFancyArrow(object) || isSimpleArrow(object) || !!(object && object.arrowType === "curved");
     }
 
 
@@ -1802,13 +1813,111 @@
         });
     }
 
+    // Flèche courbe : un seul Path Fabric (corps Bézier + pointe), donc
+    // déplacement, sélection, copie et historique restent atomiques.
+    function createCurvedArrow(x1, y1, cx, cy, x2, y2, color, strokeWidth, opacity = 1) {
+        // Même principe que createSimpleArrow : une seule forme fermée,
+        // constituée du corps et de la pointe. Les deux bords du corps suivent
+        // la courbe de Bézier ; aucun segment droit ne relie les extrémités.
+        const tangentX = x2 - cx;
+        const tangentY = y2 - cy;
+        const tangentLength = Math.hypot(tangentX, tangentY);
+        const chordLength = Math.hypot(x2 - x1, y2 - y1);
+        if (chordLength < 1 || tangentLength < 0.001) return null;
+
+        const ux = tangentX / tangentLength;
+        const uy = tangentY / tangentLength;
+        const px = -uy;
+        const py = ux;
+        const shaftWidth = Math.max(2.5, strokeWidth * 0.85);
+        const headWidth = Math.max(12, strokeWidth * 3.2);
+        const headLength = Math.min(chordLength * 0.48, Math.max(18, strokeWidth * 4.2));
+        const baseX = x2 - ux * headLength;
+        const baseY = y2 - uy * headLength;
+
+        // Échantillonnage des deux bords du corps jusqu'à la base de la pointe.
+        const upperSide = [];
+        const lowerSide = [];
+        const count = Math.max(24, Math.min(96, Math.ceil(chordLength / 5)));
+
+        for (let i = 0; i <= count; i++) {
+            const t = i / count;
+            const omt = 1 - t;
+            const x = omt * omt * x1 + 2 * omt * t * cx + t * t * baseX;
+            const y = omt * omt * y1 + 2 * omt * t * cy + t * t * baseY;
+            const tx = 2 * omt * (cx - x1) + 2 * t * (baseX - cx);
+            const ty = 2 * omt * (cy - y1) + 2 * t * (baseY - cy);
+            const length = Math.hypot(tx, ty) || 1;
+            const nx = -ty / length;
+            const ny = tx / length;
+            upperSide.push({ x: x + nx * shaftWidth / 2, y: y + ny * shaftWidth / 2 });
+            lowerSide.push({ x: x - nx * shaftWidth / 2, y: y - ny * shaftWidth / 2 });
+        }
+
+        // La pointe est insérée ENTRE les deux bords du corps, et non après
+        // leur fermeture : cela évite les diagonales parasites vers l'origine.
+        const points = [
+            ...upperSide,
+            { x: baseX + px * headWidth / 2, y: baseY + py * headWidth / 2 },
+            { x: x2, y: y2 },
+            { x: baseX - px * headWidth / 2, y: baseY - py * headWidth / 2 },
+            ...lowerSide.slice().reverse()
+        ];
+
+        const shadedContour = Math.max(5.5, strokeWidth * 0.88);
+        const outlineWidth = Math.max(2, strokeWidth * 0.4);
+        const padding = outlineWidth + shadedContour * 3 + 3;
+        const minX = Math.min(...points.map(point => point.x)) - padding;
+        const minY = Math.min(...points.map(point => point.y)) - padding;
+        const local = points.map(point => ({ x: point.x - minX, y: point.y - minY }));
+        const pathData = `M ${local.map(point => `${point.x} ${point.y}`).join(" L ")} Z`;
+
+        return new fabric.Path(pathData, {
+            left: minX + padding,
+            top: minY + padding,
+            originX: "left",
+            originY: "top",
+            fill: color,
+            stroke: "#ffffff",
+            strokeWidth: outlineWidth,
+            strokeLineJoin: "round",
+            strokeLineCap: "round",
+            shadow: new fabric.Shadow({
+                color: "rgba(35, 35, 35, 0.88)",
+                blur: shadedContour,
+                offsetX: 0,
+                offsetY: 0
+            }),
+            opacity,
+            selectable: false,
+            evented: false,
+            hasControls: false,
+            hasBorders: true,
+            lockScalingX: true,
+            lockScalingY: true,
+            lockRotation: true,
+            objectCaching: false,
+            arrowType: "curved",
+            arrowColor: color,
+            arrowStrokeWidth: strokeWidth,
+            x1, y1, cx, cy, x2, y2
+        });
+    }
+
     /* =====================================================
     RECONSTRUCTION
     ===================================================== */
 
-    function rebuildArrow(oldArrow, x1, y1, x2, y2) {
+    function rebuildArrow(oldArrow, x1, y1, x2, y2, cx = oldArrow.cx, cy = oldArrow.cy) {
         const color = oldArrow.arrowColor || getColor();
         const strokeWidth = oldArrow.arrowStrokeWidth || getStrokeWidth();
+
+        if (oldArrow.arrowType === "curved") {
+            return createCurvedArrow(
+                x1, y1, cx, cy, x2, y2,
+                color, strokeWidth, oldArrow.opacity ?? 1
+            );
+        }
 
         if (isSimpleArrow(oldArrow)) {
             return createSimpleArrow(
@@ -1913,6 +2022,7 @@
         arrowHandleEnd.classList.add(
             "visible"
         );
+        arrowHandleControl.classList.toggle("visible", object.arrowType === "curved");
 
 
         positionArrowHandles(
@@ -1930,6 +2040,7 @@
         arrowHandleEnd.classList.remove(
             "visible"
         );
+        arrowHandleControl.classList.remove("visible");
     }
 
 
@@ -1962,6 +2073,10 @@
             object.y1 += dy;
             object.x2 += dx;
             object.y2 += dy;
+            if (object.arrowType === "curved") {
+                object.cx += dx;
+                object.cy += dy;
+            }
         });
     }
 
@@ -1987,8 +2102,13 @@
          */
         let startScene;
         let endScene;
+        let controlScene = null;
 
-        if (isSimpleArrow(object) || isFancyArrow(object)) {
+        if (object.arrowType === "curved") {
+            startScene = new fabric.Point(object.x1, object.y1);
+            endScene = new fabric.Point(object.x2, object.y2);
+            controlScene = new fabric.Point(object.cx, object.cy);
+        } else if (isSimpleArrow(object) || isFancyArrow(object)) {
             const pathOffset = object.pathOffset || new fabric.Point(0, 0);
             const objectMatrix = object.calcTransformMatrix();
             const startLocal = new fabric.Point(
@@ -2019,6 +2139,12 @@
         arrowHandleStart.style.top = `${offsetY + startScreen.y}px`;
         arrowHandleEnd.style.left = `${offsetX + endScreen.x}px`;
         arrowHandleEnd.style.top = `${offsetY + endScreen.y}px`;
+
+        if (controlScene) {
+            const controlScreen = fabric.util.transformPoint(controlScene, canvas.viewportTransform);
+            arrowHandleControl.style.left = `${offsetX + controlScreen.x}px`;
+            arrowHandleControl.style.top = `${offsetY + controlScreen.y}px`;
+        }
     }
 
     /* =====================================================
@@ -2048,14 +2174,17 @@
         // et la longueur initiale est conservée pendant toute la rotation.
         const initialDx = editingArrow.x2 - editingArrow.x1;
         const initialDy = editingArrow.y2 - editingArrow.y1;
-        arrowHandleDragGeometry = {
+        arrowHandleDragGeometry = which === "control" ? null : {
             fixedX: which === "start" ? editingArrow.x2 : editingArrow.x1,
             fixedY: which === "start" ? editingArrow.y2 : editingArrow.y1,
             length: Math.hypot(initialDx, initialDy)
         };
 
         // Mémorise le décalage de prise pour éviter tout saut au premier mouvement.
-        if (isSimpleArrow(editingArrow) || isFancyArrow(editingArrow)) {
+        if (which === "control" && editingArrow.arrowType === "curved") {
+            const pointer = canvas.getScenePoint(event);
+            arrowHandleDragOffset = { x: editingArrow.cx - pointer.x, y: editingArrow.cy - pointer.y };
+        } else if (isSimpleArrow(editingArrow) || isFancyArrow(editingArrow)) {
             const pointer = canvas.getScenePoint(event);
             const anchorX = which === "start" ? editingArrow.x1 : editingArrow.x2;
             const anchorY = which === "start" ? editingArrow.y1 : editingArrow.y2;
@@ -2070,12 +2199,11 @@
 
 
         updateStatus(
-
             which === "start"
-
                 ? "Déplacement du début de la flèche"
-
-                : "Déplacement de la pointe de la flèche"
+                : which === "end"
+                    ? "Déplacement de la pointe de la flèche"
+                    : "Modification de la courbure"
         );
     }
 
@@ -2100,6 +2228,24 @@
     function updateArrowHandleAtPoint(point, ctrlKey, shiftKey = false, altKey = false) {
         if (!draggingArrowHandle || !editingArrow) return;
 
+
+        // La poignée centrale ne déplace que le point de contrôle de Bézier.
+        if (draggingArrowHandle === "control" && editingArrow.arrowType === "curved") {
+            const cx = clamp(point.x + (arrowHandleDragOffset?.x || 0), -100, CANVAS_WIDTH + 100);
+            const cy = clamp(point.y + (arrowHandleDragOffset?.y || 0), -100, CANVAS_HEIGHT + 100);
+            const newArrow = rebuildArrow(editingArrow, editingArrow.x1, editingArrow.y1, editingArrow.x2, editingArrow.y2, cx, cy);
+            if (!newArrow) return;
+            const objects = canvas.getObjects();
+            const oldIndex = objects.indexOf(editingArrow);
+            canvas.remove(editingArrow);
+            canvas.insertAt(Math.max(0, oldIndex), newArrow);
+            newArrow.set({ selectable: true, evented: true, hasControls: false, hasBorders: false, lockScalingX: true, lockScalingY: true, lockRotation: true });
+            editingArrow = newArrow;
+            canvas.setActiveObject(newArrow);
+            canvas.renderAll();
+            positionArrowHandles(newArrow);
+            return;
+        }
 
         let x1 =
             editingArrow.x1;
@@ -2153,7 +2299,7 @@
 
         // Alt : rotation autour de l'extrémité opposée, longueur initiale constante.
         // Alt + Ctrl : même rotation, avec un angle accroché tous les 10 degrés.
-        if (altKey && arrowHandleDragGeometry) {
+        if (altKey && arrowHandleDragGeometry && editingArrow.arrowType !== "curved") {
             const { fixedX, fixedY, length } = arrowHandleDragGeometry;
             let movingX = draggingArrowHandle === "start" ? x1 : x2;
             let movingY = draggingArrowHandle === "start" ? y1 : y2;
@@ -2231,7 +2377,9 @@
                 y1,
 
                 x2,
-                y2
+                y2,
+                editingArrow.cx,
+                editingArrow.cy
             );
 
 
@@ -2355,6 +2503,19 @@
     );
 
 
+    arrowHandleControl.addEventListener(
+        "pointerdown",
+        event => {
+            event.preventDefault();
+            event.stopPropagation();
+            editingArrow = canvas.getActiveObject();
+            if (editingArrow && editingArrow.arrowType === "curved") {
+                startArrowHandleDrag(event, "control");
+            }
+        }
+    );
+
+
     arrowHandleEnd.addEventListener(
         "pointerdown",
         event => {
@@ -2413,7 +2574,7 @@
 
 
         const pointer =
-            (currentTool === "arrow" || currentTool === "simpleArrow")
+            (currentTool === "arrow" || currentTool === "simpleArrow" || currentTool === "curvedArrow")
                 ? getArrowScenePointFromPointer(event.e)
                 : canvas.getScenePoint(event.e);
 
@@ -2645,6 +2806,18 @@
                 getColor(), getStrokeWidth(), getStrokeOpacity()
             );
         }
+        else if (currentTool === "curvedArrow") {
+            curvedArrowStage = 0;
+            curvedArrowStart = { ...drawStart };
+            curvedArrowEnd = { x: drawStart.x + 1, y: drawStart.y + 1 };
+            curvedArrowControl = { x: drawStart.x + 0.5, y: drawStart.y + 0.5 };
+            temporaryObject = createCurvedArrow(
+                curvedArrowStart.x, curvedArrowStart.y,
+                curvedArrowControl.x, curvedArrowControl.y,
+                curvedArrowEnd.x, curvedArrowEnd.y,
+                getColor(), getStrokeWidth(), getStrokeOpacity()
+            );
+        }
 
 
         if (temporaryObject) {
@@ -2687,6 +2860,22 @@
             updateTemporaryArrowAtPoint({ x, y }, ctrlKey, shiftKey);
             return;
         }
+        if (currentTool === "curvedArrow") {
+            curvedArrowEnd = { x, y };
+            curvedArrowControl = { x: (drawStart.x + x) / 2, y: (drawStart.y + y) / 2 };
+            const replacement = createCurvedArrow(
+                drawStart.x, drawStart.y, curvedArrowControl.x, curvedArrowControl.y,
+                x, y, getColor(), getStrokeWidth(), getStrokeOpacity()
+            );
+            if (replacement) {
+                const index = canvas.getObjects().indexOf(temporaryObject);
+                canvas.remove(temporaryObject);
+                temporaryObject = replacement;
+                canvas.insertAt(Math.max(0, index), replacement);
+            }
+            canvas.requestRenderAll();
+            return;
+        }
 
         // Les formes rectangulaires et l'ellipse utilisent deux dimensions
         // indépendantes, chacune arrondie au multiple de 10 px le plus proche.
@@ -2721,7 +2910,7 @@
         if (!drawing || !temporaryObject) return;
 
         const pointer =
-            (currentTool === "arrow" || currentTool === "simpleArrow")
+            (currentTool === "arrow" || currentTool === "simpleArrow" || currentTool === "curvedArrow")
                 ? getArrowScenePointFromPointer(event.e)
                 : canvas.getScenePoint(event.e);
         const point = { x: pointer.x, y: pointer.y };
@@ -2950,6 +3139,10 @@
     // et on déplace cet objet, sans démarrer un second tracé.
     let pendingObjectGesture = null;
     let shapeDrawGesture = null;
+    let curvedArrowStage = 0;
+    let curvedArrowStart = null;
+    let curvedArrowEnd = null;
+    let curvedArrowControl = null;
     const OBJECT_DRAG_THRESHOLD = 4; // pixels écran
     const DRAG_DRAW_TOOLS = new Set([
         "rectangle", "circle", "highlight", "magnifier", "blur"
@@ -2968,6 +3161,11 @@
             } else {
                 updateStatus("Impossible de prélever cette couleur.");
             }
+            return;
+        }
+
+        // Deuxième phase de la flèche courbe : le clic suivant valide le tracé.
+        if (currentTool === "curvedArrow" && curvedArrowStage === 1) {
             return;
         }
 
@@ -3072,6 +3270,25 @@
             return;
         }
 
+        if (currentTool === "curvedArrow" && curvedArrowStage === 1 && curvedArrowStart && curvedArrowEnd) {
+            const point = getArrowScenePointFromPointer(event.e);
+            curvedArrowControl = { x: point.x, y: point.y };
+            const replacement = createCurvedArrow(
+                curvedArrowStart.x, curvedArrowStart.y,
+                curvedArrowControl.x, curvedArrowControl.y,
+                curvedArrowEnd.x, curvedArrowEnd.y,
+                getColor(), getStrokeWidth(), getStrokeOpacity()
+            );
+            if (replacement) {
+                const index = canvas.getObjects().indexOf(temporaryObject);
+                if (temporaryObject) canvas.remove(temporaryObject);
+                temporaryObject = replacement;
+                canvas.insertAt(Math.max(0, index), replacement);
+                canvas.requestRenderAll();
+            }
+            return;
+        }
+
         drawingMove(event);
     });
 
@@ -3105,6 +3322,57 @@
                 saveHistory();
                 updateEmptyMessage();
             }
+            return;
+        }
+
+        // Fin de la première phase : mémoriser le point d'arrivée et attendre
+        // que l'utilisateur règle la courbure à la souris.
+        if (currentTool === "curvedArrow" && curvedArrowStage === 0 && drawing) {
+            const pointer = getArrowScenePointFromPointer(event.e);
+            curvedArrowEnd = { x: pointer.x, y: pointer.y };
+            drawing = false;
+            rawDrawStart = null;
+            if (temporaryObject) canvas.remove(temporaryObject);
+            temporaryObject = null;
+            if (Math.hypot(curvedArrowEnd.x - curvedArrowStart.x, curvedArrowEnd.y - curvedArrowStart.y) < 8) {
+                curvedArrowStage = 0;
+                curvedArrowStart = curvedArrowEnd = curvedArrowControl = null;
+                canvas.requestRenderAll();
+                return;
+            }
+            curvedArrowStage = 1;
+            curvedArrowControl = { x: (curvedArrowStart.x + curvedArrowEnd.x) / 2, y: (curvedArrowStart.y + curvedArrowEnd.y) / 2 };
+            temporaryObject = createCurvedArrow(
+                curvedArrowStart.x, curvedArrowStart.y,
+                curvedArrowControl.x, curvedArrowControl.y,
+                curvedArrowEnd.x, curvedArrowEnd.y,
+                getColor(), getStrokeWidth(), getStrokeOpacity()
+            );
+            if (temporaryObject) canvas.add(temporaryObject);
+            updateStatus(FUZE_LANGUAGE === "en"
+                ? "Move the mouse to adjust the curve, then click to confirm"
+                : "Déplacez la souris pour régler la courbure, puis cliquez pour valider");
+            canvas.requestRenderAll();
+            return;
+        }
+
+        // Deuxième clic : transformer l'aperçu en objet définitif et
+        // enregistrer une seule entrée d'historique.
+        if (currentTool === "curvedArrow" && curvedArrowStage === 1) {
+            if (temporaryObject) {
+                temporaryObject.set({ selectable: true, evented: true });
+                temporaryObject.arrowColor = getColor();
+                temporaryObject.arrowStrokeWidth = getStrokeWidth();
+                canvas.setActiveObject(temporaryObject);
+                trackEvent("element_created", { element_type: "curved_arrow" });
+                canvas.requestRenderAll();
+                saveHistory();
+                updateEmptyMessage();
+            }
+            temporaryObject = null;
+            curvedArrowStage = 0;
+            curvedArrowStart = curvedArrowEnd = curvedArrowControl = null;
+            updateStatus(FUZE_LANGUAGE === "en" ? "Curved arrow created" : "Flèche courbe créée");
             return;
         }
 
@@ -3826,6 +4094,10 @@
 
             object.x2 += dx;
             object.y2 += dy;
+            if (object.arrowType === "curved") {
+                object.cx += dx;
+                object.cy += dy;
+            }
 
 
             object.__previousLeft =

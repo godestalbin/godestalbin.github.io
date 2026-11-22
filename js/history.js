@@ -7,6 +7,8 @@
 const SERIALIZED_PROPERTIES = [
 
     "arrowType",
+    "cx",
+    "cy",
 
     "x1",
     "y1",

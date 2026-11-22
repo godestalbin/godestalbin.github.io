@@ -170,7 +170,7 @@ function syncControlsFromSelectedObject() {
     ------------------------------------------------- */
 
     if (
-        isFancyArrow(object) || isSimpleArrow(object)
+        isFancyArrow(object) || isSimpleArrow(object) || object.arrowType === "curved"
     ) {
         // Une sélection simple doit toujours réafficher l'épaisseur propre à
         // cette flèche, même après la désélection d'une multi-sélection.
@@ -331,11 +331,34 @@ function updateSelectedObject(source = null) {
         // Changer arrowStrokeWidth seul ne suffit pas : l'épaisseur d'une flèche
         // est intégrée à sa géométrie (corps, pointe, contour et ombre). Il faut
         // donc reconstruire les flèches après avoir libéré l'ActiveSelection.
-        const rebuildSelectedArrows = widthWasEdited && selectedObjects.some(isEditableArrow);
+        const rebuildSelectedArrows = (widthWasEdited || colorWasEdited || opacityWasEdited) && selectedObjects.some(item => item.arrowType === "curved" || (widthWasEdited && isEditableArrow(item)));
         if (rebuildSelectedArrows) canvas.discardActiveObject();
         const updatedSelection = [];
 
         selectedObjects.forEach(item => {
+            // Flèche courbe : reconstruire le ruban pour appliquer l'épaisseur,
+            // la couleur et la transparence comme aux autres flèches.
+            if (item.arrowType === "curved") {
+                if (widthWasEdited || colorWasEdited || opacityWasEdited) {
+                    const replacement = createCurvedArrow(
+                        item.x1, item.y1, item.cx, item.cy, item.x2, item.y2,
+                        colorWasEdited ? newColor : (item.arrowColor || item.fill || newColor),
+                        widthWasEdited ? newWidth : (item.arrowStrokeWidth || newWidth),
+                        opacityWasEdited ? newOpacity : (item.opacity ?? 1)
+                    );
+                    if (replacement) {
+                        replacement.set({ selectable: true, evented: true, hasControls: false, hasBorders: false });
+                        const index = canvas.getObjects().indexOf(item);
+                        if (index >= 0) {
+                            canvas.remove(item);
+                            canvas.insertAt(index, replacement);
+                            updatedSelection.push(replacement);
+                        } else updatedSelection.push(item);
+                    } else updatedSelection.push(item);
+                } else updatedSelection.push(item);
+                return;
+            }
+
             // Flèches : la couleur du corps ne doit jamais toucher au contour blanc.
             if (isEditableArrow(item)) {
                 if (widthWasEdited) {
@@ -488,6 +511,25 @@ function updateSelectedObject(source = null) {
     /* -------------------------------------------------
        FLÈCHE
     ------------------------------------------------- */
+
+    if (object.arrowType === "curved") {
+        const newArrow = createCurvedArrow(
+            object.x1, object.y1, object.cx, object.cy, object.x2, object.y2,
+            getColor(), getStrokeWidth(), getStrokeOpacity()
+        );
+        if (!newArrow) return;
+        const index = canvas.getObjects().indexOf(object);
+        if (index < 0) return;
+        canvas.remove(object);
+        canvas.insertAt(index, newArrow);
+        newArrow.set({ selectable: true, evented: true, hasControls: false, hasBorders: false });
+        canvas.setActiveObject(newArrow);
+        canvas.requestRenderAll();
+        syncControlsFromSelectedObject();
+        saveHistory();
+        updateStatus("Flèche courbe modifiée");
+        return;
+    }
 
     if (isSimpleArrow(object)) {
         const newArrow = createSimpleArrow(
