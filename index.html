@@ -152,6 +152,23 @@
     .feature:nth-child(3n) .feature-icon { background: rgba(173,4,4,.09); color: var(--red); }
     .feature h3 { margin: 17px 0 7px; font-size: 1.1rem; letter-spacing: -.025em; }
     .feature p { margin: 0; color: var(--muted); font-size: .93rem; }
+    .video-container {
+      width: min(900px, 100%);
+      margin: 0 auto;
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      border-radius: 18px;
+      background: #202821;
+      box-shadow: var(--shadow);
+    }
+    .video-container iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+    .video-fallback { margin: 18px 0 0; text-align: center; }
+    .video-fallback a { color: var(--green); text-decoration: underline; }
     .workflow { background: #e9ebdf; }
     .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; counter-reset: step; }
     .step { position: relative; padding: 0 12px; counter-increment: step; }
@@ -232,7 +249,7 @@
       <nav aria-label="Navigation principale">
         <a class="brand" href="#accueil" aria-label="Fuze, accueil"><span class="brand-mark">F</span> fuze</a>
         <div class="navlinks">
-          <a href="#fonctionnalites">Fonctionnalités</a>
+          <a href="#fonctionnalites">La vidéo</a>
           <a href="#comment">Comment ça marche</a>
           <a href="#projets">Vos projets</a>
         </div>
@@ -251,7 +268,7 @@
           <p class="hero-copy">Une image vaut mille mots. Avec Fuze, ajoutez des flèches, des formes, des textes et des repères directement sur vos images pour faire passer votre message sans ambiguïté.</p>
           <div class="hero-actions">
             <a class="btn btn-yellow" href="#demarrer">Découvrir Fuze <span aria-hidden="true">→</span></a>
-            <a class="btn btn-outline" href="#fonctionnalites">Voir les fonctionnalités</a>
+            <a class="btn btn-outline" href="#fonctionnalites">Voir la vidéo</a>
           </div>
           <p class="micro">Un espace de travail visuel pour expliquer, commenter et guider.</p>
         </div>
@@ -261,7 +278,7 @@
           <div class="editor">
             <div class="editor-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="editor-name">Fuze · Espace d’annotation</span></div>
             <div class="editor-body">
-              <img class="demo-screen" src="Fuze - Fake screen demo.png" alt="Capture d’écran de démonstration de Fuze">
+              <img class="demo-screen" src="images/Fuze - Fake screen demo.png" alt="Capture d’écran de démonstration de Fuze">
             </div>
           </div>
           <div class="float-tag tag-two">✓ Un retour précis, tout de suite</div>
@@ -281,42 +298,28 @@
     <section id="fonctionnalites">
       <div class="wrap">
         <div class="section-head">
-          <div class="kicker">Tout ce qu’il faut pour être compris</div>
-          <h2>Vos annotations. Votre façon d’expliquer.</h2>
-          <p>Fuze rassemble les outils essentiels pour attirer l’attention, détailler un point et transformer une simple capture en explication visuelle.</p>
+          <div class="kicker">Découvrez Fuze en quelques minutes</div>
+          <h2>Voyez Fuze en action.</h2>
+          <p>Une présentation vidéo des outils et des possibilités de Fuze.</p>
         </div>
-        <div class="features">
-          <article class="feature">
-            <div class="feature-icon">➜</div>
-            <h3>Flèches qui guident</h3>
-            <p>Dirigez le regard vers le bon endroit avec des flèches classiques ou des Smart Arrows.</p>
-          </article>
-          <article class="feature">
-            <div class="feature-icon">▢</div>
-            <h3>Formes pour encadrer</h3>
-            <p>Utilisez rectangles et cercles pour isoler une zone ou mettre un détail en évidence.</p>
-          </article>
-          <article class="feature">
-            <div class="feature-icon">T</div>
-            <h3>Textes et numéros</h3>
-            <p>Ajoutez une consigne, une précision ou une suite d’étapes numérotées.</p>
-          </article>
-          <article class="feature">
-            <div class="feature-icon">✎</div>
-            <h3>Dessin libre</h3>
-            <p>Tracez à main levée pour entourer, souligner ou illustrer rapidement votre idée.</p>
-          </article>
-          <article class="feature">
-            <div class="feature-icon">▰</div>
-            <h3>Mettre en lumière</h3>
-            <p>Attirez l’œil avec le surlignage et ajustez l’apparence de vos annotations.</p>
-          </article>
-          <article class="feature">
-            <div class="feature-icon">◉</div>
-            <h3>Flouter une zone</h3>
-            <p>Masquez les informations qui ne doivent pas apparaître dans votre visuel.</p>
-          </article>
+        <div class="video-container">
+          <iframe
+            id="fuze-presentation-video"
+            data-src="https://www.youtube.com/embed/vMWlY5F4MNY?autoplay=1&amp;mute=1&amp;playsinline=1&amp;rel=0"
+            title="Présentation de Fuze – outil d’annotation d’images"
+            loading="lazy"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen>
+          </iframe>
         </div>
+        <noscript>
+          <p class="video-fallback">
+            <a href="https://youtu.be/vMWlY5F4MNY" target="_blank" rel="noopener noreferrer">
+              Regarder la présentation de Fuze sur YouTube
+            </a>
+          </p>
+        </noscript>
       </div>
     </section>
 
@@ -398,5 +401,32 @@
       <a href="#accueil">Retour en haut ↑</a>
     </div>
   </footer>
-</body>
+
+  <script>
+    (() => {
+      const videoSection = document.getElementById("fonctionnalites");
+      const videoFrame = document.getElementById("fuze-presentation-video");
+      if (!videoSection || !videoFrame) return;
+
+      const startVideo = () => {
+        if (videoFrame.dataset.started === "true") return;
+        videoFrame.dataset.started = "true";
+        videoFrame.src = videoFrame.dataset.src;
+      };
+
+      if ("IntersectionObserver" in window) {
+        const observer = new IntersectionObserver((entries) => {
+          if (entries.some(entry => entry.isIntersecting)) {
+            startVideo();
+            observer.disconnect();
+          }
+        }, { threshold: 0.25 });
+
+        observer.observe(videoSection);
+      } else {
+        startVideo();
+      }
+    })();
+  </script>
+\n</body>
 </html>
