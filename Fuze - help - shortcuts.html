@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script>
+        if (location.protocol !== "file:") {
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-KCKN5KPES3');
+            const gaScript = document.createElement('script');
+            gaScript.async = true;
+            gaScript.src = 'https://www.googletagmanager.com/gtag/js?id=G-KCKN5KPES3';
+            document.head.appendChild(gaScript);
+            const adsScript = document.createElement('script');
+            adsScript.async = true;
+            adsScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6392049906379676';
+            adsScript.crossOrigin = 'anonymous';
+            document.head.appendChild(adsScript);
+        }
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuze Help</title>
+    <meta name="description" content="Quick start, keyboard shortcuts and advanced tips for Fuze, the online image annotation tool.">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <style>
+        :root {
+            color-scheme: light;
+            --page: #f4f1eb;
+            --surface: #ffffff;
+            --ink: #252923;
+            --muted: #697067;
+            --line: #e7e5df;
+            --accent: #52664a;
+            --accent-soft: #edf2e9;
+            --key-shadow: 0 2px 0 #d9d9d5, 0 3px 7px rgba(31, 36, 30, .10);
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; min-height: 100%; }
+        body {
+            padding: clamp(16px, 3.5vw, 34px);
+            background: var(--page);
+            color: var(--ink);
+            font-family: "Work Sans", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+        }
+        main { width: min(100%, 900px); margin: 0 auto; }
+        .page-header { margin-bottom: 24px; }
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: .13em;
+            text-transform: uppercase;
+        }
+        .brand-mark {
+            display: inline-grid;
+            width: 25px;
+            height: 25px;
+            place-items: center;
+            border-radius: 8px;
+            background: var(--accent);
+            color: white;
+            font-size: 14px;
+            letter-spacing: 0;
+        }
+        h1 { margin: 0; font-size: clamp(27px, 4vw, 36px); line-height: 1.12; letter-spacing: -.04em; }
+        .intro { margin: 9px 0 0; color: var(--muted); font-size: 15px; line-height: 1.55; }
+        section {
+            margin-top: 18px;
+            padding: clamp(18px, 3vw, 26px);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: var(--surface);
+            box-shadow: 0 5px 18px rgba(40, 43, 36, .035);
+        }
+        h2 { margin: 0 0 14px; font-size: 19px; letter-spacing: -.02em; }
+        .quick-copy { margin: 0 0 17px; font-size: 16px; line-height: 1.6; }
+        .hero-image {
+            display: block;
+            width: 100%;
+            height: auto;
+            border: 1px solid #e8e5dd;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(33, 39, 31, .10);
+        }
+        .image-caption { margin: 9px 2px 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+        .shortcut-table { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.5; }
+        .shortcut-table th, .shortcut-table td { padding: 9px 8px; border-bottom: 1px solid #efeee9; text-align: left; vertical-align: top; }
+        .shortcut-table th { width: 155px; color: var(--accent); font-weight: 750; white-space: nowrap; }
+        .shortcut-table tr:last-child th, .shortcut-table tr:last-child td { border-bottom: 0; }
+        .shortcut-groups { display: grid; gap: 18px; }
+        .shortcut-group h3 {
+            margin: 0 0 7px;
+            padding-bottom: 7px;
+            border-bottom: 3px solid var(--line);
+            color: var(--accent);
+            font-size: 15px;
+            font-weight: 850;
+            letter-spacing: .02em;
+        }
+        .shortcut-list { display: grid; grid-template-columns: 1fr; gap: 0; }
+        .shortcut {
+            display: grid;
+            grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+            align-items: center;
+            gap: 14px;
+            min-height: 46px;
+            padding: 6px 3px;
+            border-bottom: 1px solid #efeee9;
+        }
+        .shortcut:last-child { border-bottom: 0; }
+        .shortcut-label { grid-column: 2; grid-row: 1; font-size: 13px; line-height: 1.4; font-weight: 500; }
+        .keys { grid-column: 1; grid-row: 1; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+        kbd {
+            display: inline-grid;
+            min-width: 31px;
+            height: 32px;
+            padding: 0 8px;
+            place-items: center;
+            border: 1px solid #e4e4e0;
+            border-radius: 7px;
+            background: #fff;
+            box-shadow: var(--key-shadow);
+            color: #252923;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 750;
+            line-height: 1;
+        }
+        .plus, .or { color: #888e85; font-size: 12px; font-weight: 700; }
+        .or { margin: 0 1px; font-size: 10px; text-transform: uppercase; }
+        .tips { display: grid; gap: 12px; }
+        .tip {
+            display: grid;
+            grid-template-columns: 34px minmax(0, 1fr);
+            gap: 12px;
+            align-items: start;
+        }
+        .tip-icon {
+            display: grid;
+            width: 34px;
+            height: 34px;
+            place-items: center;
+            border-radius: 10px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-size: 16px;
+            font-weight: 800;
+        }
+        .tip h3 { margin: 1px 0 3px; font-size: 14px; }
+        .tip p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+        footer { padding: 20px 4px 4px; color: var(--muted); font-size: 12px; text-align: center; }
+        section[lang="en"], footer span[lang="en"], .page-header [lang="en"] { display: block; }
+        section[lang="fr"], footer span[lang="fr"], .page-header [lang="fr"] { display: none; }
+        html[data-language="fr"] section[lang="en"],
+        html[data-language="fr"] footer span[lang="en"],
+        html[data-language="fr"] .page-header [lang="en"] { display: none; }
+        html[data-language="fr"] section[lang="fr"],
+        html[data-language="fr"] .page-header [lang="fr"] { display: block; }
+        html[data-language="fr"] footer span[lang="fr"] { display: block; }
+        @media (max-width: 520px) {
+            body { padding: 14px; }
+            .shortcut { grid-template-columns: minmax(112px, 40%) minmax(0, 1fr); gap: 9px; }
+            kbd { min-width: 27px; height: 29px; padding: 0 6px; font-size: 11px; }
+            .shortcut-label { font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+<main>
+    <header class="page-header">
+        <div class="brand"><span class="brand-mark">F</span> <span lang="en">Fuze Help</span><span lang="fr">Aide Fuze</span></div>
+        <h1><span lang="en">Make your images speak.</span><span lang="fr">Faites parler vos images.</span></h1>
+        <p class="intro"><span lang="en">A quick guide to annotating, editing and sharing your images.</span><span lang="fr">Un guide rapide pour annoter, modifier et partager vos images.</span></p>
+    </header>
+
+    <section lang="en" aria-labelledby="quick-start-en">
+        <h2 id="quick-start-en">Quick start</h2>
+        <p class="quick-copy">Paste an image in Fuze, then annotate with arrows, highlights, texts and many more...</p>
+        <img class="hero-image" alt="Fuze key features and associated keyboard shortcuts" src="images/Fuze - features - shortcuts.png">
+        <p class="image-caption">Combine arrows, shapes, highlights and text to make your point clear.</p>
+    </section>
+
+    <section lang="fr" aria-labelledby="quick-start-fr">
+        <h2 id="quick-start-fr">Démarrage rapide</h2>
+        <p class="quick-copy">Collez une image dans Fuze, puis annotez-la avec des flèches, des surlignages, du texte et bien plus encore…</p>
+        <img class="hero-image" alt="Les principales fonctionnalités de Fuze et les raccourcis clavier associés" src="images/Fuze - features - shortcuts.png">
+        <p class="image-caption">Combinez flèches, formes, surlignages et textes pour faire passer votre message.</p>
+    </section>
+
+    <section lang="en" aria-labelledby="toolbar-en">
+        <h2 id="toolbar-en">Toolbar</h2>
+        <img class="hero-image" alt="Fuze toolbar" src="images/Fuze - toolbar.png">
+    </section>
+
+    <section lang="fr" aria-labelledby="toolbar-fr">
+        <h2 id="toolbar-fr">Barre d’outils</h2>
+        <img class="hero-image" alt="Barre d’outils de Fuze" src="images/Fuze - toolbar.png">
+    </section>
+
+    <section lang="en" aria-labelledby="shortcuts-en">
+    <h2 id="shortcuts-en">Shortcuts</h2>
+    <div class="shortcut-groups">
+        <div class="shortcut-group">
+            <h3>Files</h3>
+            <table class="shortcut-table">
+              <tbody>
+                <tr><th scope="row">Ctrl+O</th><td>Open an image file. The image is pasted at the current pointer position. Before opening it, use the image size selector to enlarge or reduce the image.</td></tr>
+                <tr><th scope="row">Ctrl+Shift+O</th><td>Open a Fuze file (.fuze). Reopen a project with its annotations and continue editing it.</td></tr>
+                <tr><th scope="row">Ctrl+Shift+S</th><td>Save the current project as a Fuze file (.fuze) so you can edit it again later.</td></tr>
+                <tr><th scope="row">Ctrl+Alt+C</th><td>Copy the annotated image to the clipboard.</td></tr>
+                <tr><th scope="row">Ctrl+S</th><td>Download the annotated image in PNG format.</td></tr>
+                <tr><th scope="row">Ctrl+Alt+Backspace</th><td>Clear the entire canvas.</td></tr>
+                <tr><th scope="row">?</th><td>Display this help screen.</td></tr>
+              </tbody>
+            </table>
+        </div>
+        <div class="shortcut-group">
+            <h3>Editing</h3>
+            <table class="shortcut-table">
+              <tbody>
+                <tr><th scope="row">S or Esc</th><td>Selection. Deactivate the current tool and return to Selection mode.</td></tr>
+                <tr><th scope="row">T</th><td>Text. Press Esc to exit text editing.</td></tr>
+                <tr><th scope="row">N</th><td>Automatically incremented number to indicate sequence. Stroke thickness applies to the circle around the number; text size applies to the digit inside the circle.</td></tr>
+                <tr><th scope="row">Shift+T</th><td>Stamp. Stroke thickness applies to the border around the stamp text; text size applies to the stamp text.</td></tr>
+                <tr><th scope="row">A</th><td>Smart Arrow, with generous, pleasing shapes. This is the default arrow tool in Fuze.</td></tr>
+                <tr><th scope="row">Shift+A</th><td>Normal Arrow. A more traditional arrow.</td></tr>
+                <tr><th scope="row">Q</th><td>Curved Arrow. An arrow with a Bézier curve.</td></tr>
+                <tr><th scope="row">R</th><td>Rectangle.</td></tr>
+                <tr><th scope="row">C</th><td>Circle.</td></tr>
+                <tr><th scope="row">F</th><td>Felt pen. The stroke is smoothed to produce an elegant line without shaking.</td></tr>
+                <tr><th scope="row">Highlight</th><td>Rectangle with a transparent fill.</td></tr>
+                <tr><th scope="row">B</th><td>Blur. Make sensitive information unreadable.</td></tr>
+                <tr><th scope="row">Z</th><td>Zoom. Enlarge an area. You can increase or decrease the zoom area’s size. To avoid distorting the enlarged area, hold Shift while resizing it.</td></tr>
+                <tr><th scope="row">O</th><td>Border around an image or the zoom area. You can adjust the border’s size and color.</td></tr>
+                <tr><th scope="row">P</th><td>Eyedropper. Pick a color and apply it to the currently selected object.</td></tr>
+              </tbody>
+            </table>
+        </div>
+        <div class="shortcut-group">
+            <h3>Other</h3>
+            <table class="shortcut-table">
+              <tbody>
+                <tr><th scope="row">Ctrl+A</th><td>Select all objects on the canvas.</td></tr>
+                <tr><th scope="row">Shift + drag</th><td>Use a 10-pixel grid when moving objects.</td></tr>
+                <tr><th scope="row">Ctrl + drag an arrow handle</th><td>Constrain the arrow angle to 10° increments.</td></tr>
+                <tr><th scope="row">Alt + drag an arrow handle</th><td>Keep the arrow’s current length.</td></tr>
+                <tr><th scope="row">Ctrl + Shift + Alt</th><td>Combine all three arrow-handle effects: 10-pixel movement grid, 10° angle increments and constant arrow length.</td></tr>
+              </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section lang="fr" aria-labelledby="shortcuts-fr">
+    <h2 id="shortcuts-fr">Raccourcis clavier</h2>
+    <div class="shortcut-groups">
+        <div class="shortcut-group">
+            <h3>Fichier</h3>
+            <table class="shortcut-table">
+              <tbody>
+                <tr><th scope="row">Ctrl+O</th><td>Ouvrir un fichier image. L'image sera copiée à la position actuelle du curseur. Avant d'ouvrir l'image, la sélection de la taille permet de l'agrandir ou de la réduire.</td></tr>
+                <tr><th scope="row">Ctrl+Shift+O</th><td>Ouvrir un fichier Fuze (.fuze). Permet de reprendre un projet avec ses annotations et de continuer à le modifier.</td></tr>
+                <tr><th scope="row">Ctrl+Shift+S</th><td>Enregistrer le projet actuel dans un fichier Fuze (.fuze) pour pouvoir le modifier plus tard.</td></tr>
+                <tr><th scope="row">Ctrl+Alt+C</th><td>Copier l'image annotée dans le presse-papiers.</td></tr>
+                <tr><th scope="row">Ctrl+S</th><td>Télécharger l'image annotée au format PNG.</td></tr>
+                <tr><th scope="row">Ctrl+Alt+Backspace</th><td>Effacer entièrement le canvas.</td></tr>
+                <tr><th scope="row">?</th><td>Afficher cet écran d'aide.</td></tr>
+              </tbody>
+            </table>
+        </div>
+        <div class="shortcut-group">
+            <h3>Édition</h3>
+            <table class="shortcut-table">
+              <tbody>
+                <tr><th scope="row">S ou Échap</th><td>Sélection. Désactive l'outil en cours et revient en mode Sélection.</td></tr>
+                <tr><th scope="row">T</th><td>Texte. Pour sortir de l'édition du texte, appuyez sur Échap.</td></tr>
+                <tr><th scope="row">N</th><td>Numéro incrémenté automatiquement pour indiquer une séquentialité. L'épaisseur du trait s'applique au cercle autour du numéro ; la taille du texte s'applique au chiffre à l'intérieur du cercle.</td></tr>
+                <tr><th scope="row">Shift+T</th><td>Tampon. L'épaisseur du trait s'applique au contour autour du texte du tampon ; la taille du texte s'applique au texte du tampon.</td></tr>
+                <tr><th scope="row">A</th><td>Flèche Smart, avec des formes généreuses et agréables à regarder. C’est la flèche standard de Fuze.</td></tr>
+                <tr><th scope="row">Shift+A</th><td>Flèche normale. Une flèche plus classique.</td></tr>
+                <tr><th scope="row">Q</th><td>Flèche courbe. Une flèche avec une courbe de Bézier.</td></tr>
+                <tr><th scope="row">R</th><td>Rectangle.</td></tr>
+                <tr><th scope="row">C</th><td>Cercle.</td></tr>
+                <tr><th scope="row">F</th><td>Feutre. Le tracé est corrigé pour garantir un trait élégant sans tremblement.</td></tr>
+                <tr><th scope="row">Highlight</th><td>Rectangle avec transparence à l’intérieur.</td></tr>
+                <tr><th scope="row">B</th><td>Brouillage, pour rendre illisibles les informations sensibles.</td></tr>
+                <tr><th scope="row">Z</th><td>Zoom pour agrandir une zone. La zone de grossissement peut être agrandie ou réduite. Pour ne pas la déformer, maintenez Shift pendant le redimensionnement.</td></tr>
+                <tr><th scope="row">O</th><td>Bordure autour d'une image ou de la zone de grossissement. La taille et la couleur de la bordure peuvent être ajustées.</td></tr>
+                <tr><th scope="row">P</th><td>Pipette pour prélever une couleur et l’appliquer à l’objet actuellement sélectionné.</td></tr>
+              </tbody>
+            </table>
+        </div>
+        <div class="shortcut-group">
+            <h3>Autres</h3>
+            <table class="shortcut-table">
+              <tbody>
+                <tr><th scope="row">Ctrl+A</th><td>Sélectionner tous les objets du canvas.</td></tr>
+                <tr><th scope="row">Shift + déplacement</th><td>Utiliser une grille de 10 pixels pour les déplacements.</td></tr>
+                <tr><th scope="row">Ctrl + déplacement d'une poignée de flèche</th><td>Conserver des angles de 10° pour la flèche.</td></tr>
+                <tr><th scope="row">Alt + déplacement d'une poignée de flèche</th><td>Conserver la longueur actuelle de la flèche.</td></tr>
+                <tr><th scope="row">Ctrl + Shift + Alt</th><td>Conjuguer les trois effets sur les poignées de flèche : grille de déplacement de 10 pixels, angles par pas de 10° et conservation de la longueur.</td></tr>
+              </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+    <section lang="en" aria-labelledby="advanced-en">
+        <h2 id="advanced-en">Tips &amp; advanced features</h2>
+        <div class="tips">
+            <article class="tip"><span class="tip-icon">✦</span><div><h3>Keep your tool active</h3><p>Annotation tools stay active after you use them, so you can add several objects in a row. Press <kbd>S</kbd> or <kbd>Esc</kbd> to return to Selection.</p></div></article>
+            <article class="tip"><span class="tip-icon">↖</span><div><h3>Paste exactly where you want</h3><p>When you paste an image or copied objects, the centre of the pasted content is placed at your mouse pointer. The relative positions of objects in a multi-selection are preserved.</p></div></article>
+            <article class="tip"><span class="tip-icon">↗</span><div><h3>Rotate an arrow without changing its length</h3><p>Hold <kbd>Alt</kbd> while dragging an arrow endpoint to rotate the arrow around its opposite endpoint. Add <kbd>Ctrl</kbd> to snap the rotation in 10° increments. Works with normal and Smart Arrows.</p></div></article>
+            <article class="tip"><span class="tip-icon">⌖</span><div><h3>Switch back to Selection instantly</h3><p>When a drawing tool is active, click an existing object to return to Selection and work with that object.</p></div></article>
+        </div>
+    </section>
+
+    <section lang="fr" aria-labelledby="advanced-fr">
+        <h2 id="advanced-fr">Astuces et fonctionnalités avancées</h2>
+        <div class="tips">
+            <article class="tip"><span class="tip-icon">✦</span><div><h3>Conservez votre outil actif</h3><p>Les outils d’annotation restent actifs après leur utilisation : vous pouvez ajouter plusieurs objets à la suite. Appuyez sur <kbd>S</kbd> ou <kbd>Échap</kbd> pour revenir à la Sélection.</p></div></article>
+            <article class="tip"><span class="tip-icon">↖</span><div><h3>Collez exactement où vous le souhaitez</h3><p>Lors du collage d’une image ou d’objets copiés, le centre du contenu collé se place sous le pointeur de la souris. Les positions relatives des objets d’une sélection multiple sont conservées.</p></div></article>
+            <article class="tip"><span class="tip-icon">↗</span><div><h3>Faites pivoter une flèche sans changer sa longueur</h3><p>Maintenez <kbd>Alt</kbd> pendant le déplacement d’une extrémité pour faire pivoter la flèche autour de l’autre extrémité. Ajoutez <kbd>Ctrl</kbd> pour contraindre la rotation par pas de 10°. Fonctionne avec les flèches normales et les Smart Arrows.</p></div></article>
+            <article class="tip"><span class="tip-icon">⌖</span><div><h3>Revenez rapidement à la Sélection</h3><p>Lorsqu’un outil de dessin est actif, cliquez sur un objet existant pour revenir automatiquement à la Sélection et le manipuler.</p></div></article>
+        </div>
+    </section>
+
+    <footer>
+        <span lang="en">Fuze — online image annotation tool.</span>
+        <span lang="fr">Fuze — outil d’annotation d’images en ligne.</span>
+    </footer>
+</main>
+
+<script>
+    (() => {
+        const languages = navigator.languages?.length
+            ? navigator.languages
+            : [navigator.language];
+
+        const preferred = languages.find(lang =>
+            /^fr(?:-|$)/i.test(lang) || /^en(?:-|$)/i.test(lang)
+        );
+
+        const language = preferred?.toLowerCase().startsWith("fr")
+            ? "fr"
+            : "en";
+
+        document.documentElement.dataset.language = language;
+        document.documentElement.lang = language;
+        document.title = language === "fr" ? "Aide Fuze" : "Fuze Help";
+    })();
+</script>
+
+</body>
+</html>

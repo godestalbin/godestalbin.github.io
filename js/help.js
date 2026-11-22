@@ -10,7 +10,7 @@
 
     function openHelp() {
         previousFocus = document.activeElement;
-        frame.src = "help.html";
+        frame.src = "Fuze - help - shortcuts.html";
         modal.hidden = false;
         document.body.classList.add("help-modal-open");
         closeButton.focus();
