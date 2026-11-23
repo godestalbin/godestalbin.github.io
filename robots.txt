@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://godestalbin.github.io/sitemap.xml
+Sitemap: https://fuze-image.fr/sitemap.xml
