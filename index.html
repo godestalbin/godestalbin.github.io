@@ -176,9 +176,38 @@
     .step h3 { margin: 20px 0 8px; font-size: 1.22rem; }
     .step p { margin: 0; color: #626d61; }
     .step:not(:last-child):after { content: "→"; position: absolute; right: -18px; top: 7px; color: var(--brown); font-size: 1.8rem; }
-    .split { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 70px; }
-    .split-copy h2 { max-width: 510px; }
-    .split-copy p { color: var(--muted); }
+    .feature-showcase { display: grid; gap: 58px; }
+    .feature-row {
+      display: grid;
+      grid-template-columns: 1.12fr .88fr;
+      align-items: center;
+      gap: 58px;
+    }
+    .feature-row:nth-child(even) .feature-image { order: 2; }
+    .feature-row:nth-child(even) .feature-copy { order: 1; }
+    .feature-image {
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--white);
+      box-shadow: var(--shadow);
+      line-height: 0;
+    }
+    .feature-image img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 10px;
+    }
+    .feature-copy { padding: 12px 4px; }
+    .feature-copy h3 {
+      margin: 0 0 14px;
+      font-size: clamp(1.45rem, 2.5vw, 2rem);
+      line-height: 1.15;
+      letter-spacing: -.04em;
+    }
+    .feature-copy p { margin: 0; color: var(--muted); font-size: 1.02rem; }
     .list { list-style: none; padding: 0; margin: 25px 0 0; display: grid; gap: 13px; }
     .list li { display: flex; align-items: flex-start; gap: 11px; color: #4f5c50; }
     .list b { color: var(--ink); }
@@ -210,6 +239,7 @@
     footer a { margin: 0 8px; color: inherit; }
     @media (max-width: 900px) {
       .hero-grid, .split { grid-template-columns: 1fr; gap: 48px; }
+      .feature-row { gap: 30px; }
       .hero { padding-top: 65px; }
       .visual { width: min(650px, 100%); margin: 0 auto; }
       .features { grid-template-columns: repeat(2, 1fr); }
@@ -234,6 +264,12 @@
       .tag-two { right: -7px; }
       section { padding: 68px 0; }
       .features, .steps { grid-template-columns: 1fr; gap: 14px; }
+      .feature-showcase { gap: 38px; }
+      .feature-row { grid-template-columns: 1fr; gap: 18px; }
+      .feature-row:nth-child(even) .feature-image,
+      .feature-row:nth-child(even) .feature-copy { order: initial; }
+      .feature-copy { padding: 4px 2px 0; }
+      .feature-image { padding: 8px; }
       .feature { min-height: 0; }
       .step { padding: 8px 4px 18px; }
       .step:not(:last-child):after { content: "↓"; right: 12px; top: 15px; }
@@ -351,27 +387,73 @@
     </section>
 
     <section id="projets">
-      <div class="wrap split">
-        <div class="split-copy">
-          <div class="kicker">Gardez la main sur vos créations</div>
-          <h2>Reprenez votre travail là où vous l’avez laissé.</h2>
-          <p>Une annotation n’est pas toujours définitive. Avec le format de projet <b>.fuze</b>, vous pouvez sauvegarder le contenu de votre canvas et le rouvrir pour continuer à travailler dessus.</p>
-          <ul class="list">
-            <li><span class="check">✓</span><span><b>Un projet rééditable :</b> retrouvez vos éléments et modifiez-les.</span></li>
-            <li><span class="check">✓</span><span><b>Une sélection intuitive :</b> cliquez sur un objet pour le sélectionner et ajuster ses propriétés.</span></li>
-            <li><span class="check">✓</span><span><b>Des raccourcis clavier :</b> accédez rapidement aux outils et aux fonctions avancées.</span></li>
-            <li><span class="check">✓</span><span><b>Une sélection multiple :</b> ajustez plusieurs annotations en une seule opération.</span></li>
-          </ul>
+      <div class="wrap">
+        <div class="section-head">
+          <div class="kicker">Explorez les possibilités</div>
+          <h2>Les fonctionnalités de Fuze.</h2>
+          <p>Des outils simples et pratiques pour annoter vos images, travailler efficacement et partager vos idées.</p>
         </div>
-        <div class="file-card" aria-label="Illustration d'un fichier projet Fuze">
-          <div class="file-top">
-            <div><div class="file-name">Mon annotation</div><div class="file-foot">Projet modifiable</div></div>
-            <span class="file-badge">.FUZE</span>
-          </div>
-          <div class="file-preview">
-            <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
-          </div>
-          <div class="file-foot">Votre canvas et ses annotations réunis dans un seul fichier projet.</div>
+
+        <div class="feature-showcase">
+          <article class="feature-row">
+            <div class="feature-image">
+              <img src="images/Fuze - multi image.png" alt="Plusieurs images réunies dans l’espace de travail Fuze" loading="lazy">
+            </div>
+            <div class="feature-copy">
+              <h3>Travaillez avec plusieurs images</h3>
+              <p>Importez plusieurs images dans un même espace de travail. Déplacez-les, organisez-les et annotez-les ensemble pour comparer des éléments ou présenter une situation dans son ensemble.</p>
+            </div>
+          </article>
+
+          <article class="feature-row">
+            <div class="feature-image">
+              <img src="images/Fuze - arrows.png" alt="Exemples de flèches et d’annotations dans Fuze" loading="lazy">
+            </div>
+            <div class="feature-copy">
+              <h3>Des flèches pour guider le regard</h3>
+              <p>Choisissez parmi différents styles de flèches pour pointer précisément un détail, indiquer un déplacement ou mettre en évidence une zone importante de votre image.</p>
+            </div>
+          </article>
+
+          <article class="feature-row">
+            <div class="feature-image">
+              <img src="images/Fuze - shortcuts.png" alt="Raccourcis clavier disponibles dans Fuze" loading="lazy">
+            </div>
+            <div class="feature-copy">
+              <h3>Gagnez du temps avec les raccourcis clavier</h3>
+              <p>Accédez rapidement aux outils et aux commandes essentielles sans interrompre votre travail. Les raccourcis rendent vos annotations plus fluides et efficaces.</p>
+            </div>
+          </article>
+
+          <article class="feature-row">
+            <div class="feature-image">
+              <img src="images/Fuze - zoom.png" alt="Fonction de zoom de l’espace de travail Fuze" loading="lazy">
+            </div>
+            <div class="feature-copy">
+              <h3>Zoomez pour travailler avec précision</h3>
+              <p>Ajustez le niveau de zoom pour examiner les détails ou retrouver une vue d’ensemble. Vous pouvez ainsi annoter confortablement les petites zones comme les grandes images.</p>
+            </div>
+          </article>
+
+          <article class="feature-row">
+            <div class="feature-image">
+              <img src="images/Fuze - stamps.png" alt="Tampons et repères visuels disponibles dans Fuze" loading="lazy">
+            </div>
+            <div class="feature-copy">
+              <h3>Ajoutez des tampons visuels</h3>
+              <p>Utilisez des repères prêts à l’emploi pour signaler rapidement une information, attirer l’attention ou rendre vos explications plus faciles à comprendre.</p>
+            </div>
+          </article>
+
+          <article class="feature-row">
+            <div class="feature-image">
+              <img src="images/Fuze - Save fuze.png" alt="Enregistrement d’un projet Fuze au format .fuze" loading="lazy">
+            </div>
+            <div class="feature-copy">
+              <h3>Enregistrez et retrouvez vos projets</h3>
+              <p>Sauvegardez votre travail au format <b>.fuze</b> pour conserver vos images et vos annotations modifiables. Rouvrez votre projet plus tard et reprenez exactement là où vous en étiez.</p>
+            </div>
+          </article>
         </div>
       </div>
     </section>
