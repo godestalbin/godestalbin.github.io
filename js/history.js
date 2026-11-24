@@ -35,8 +35,13 @@ const SERIALIZED_PROPERTIES = [
     "blurRadius",
     "fuzeBorderId",
     "fuzeBorderOwnerId",
+    "fuzeBorderShadowOwnerId",
     "fuzeMagnifierId",
     "fuzeMagnifierRole",
+    "fuzeMagnifierBorderEnabled",
+    "fuzeMagnifierBorderColor",
+    "fuzeMagnifierBorderOpacity",
+    "fuzeMagnifierBorderWidth",
 
 ];
 
@@ -102,6 +107,8 @@ function restoreHistoryState(
     canvas.loadFromJSON(state)
         .then(() => {
 
+            restoreFuzeBorderObjects();
+        if (typeof restoreMagnifierDecorations === "function") restoreMagnifierDecorations();
             restoringHistory = false;
 
             canvas.renderAll();

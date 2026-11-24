@@ -132,6 +132,16 @@ function syncControlsFromSelectedObject() {
 
     if (!object) return;
 
+    // Les contrôles reflètent exclusivement la bordure de chaque élément de loupe.
+    if (object.fuzeMagnifierId && ["source", "lens"].includes(object.fuzeMagnifierRole)) {
+        if (object.fuzeMagnifierBorderEnabled) {
+            if (object.fuzeMagnifierBorderColor) colorInput.value = object.fuzeMagnifierBorderColor;
+            if (Number.isFinite(Number(object.fuzeMagnifierBorderWidth))) strokeWidthInput.value = String(object.fuzeMagnifierBorderWidth);
+            strokeOpacityInput.value = String(Math.max(10, Math.min(100, Math.round((object.fuzeMagnifierBorderOpacity ?? 1) * 100))));
+            updateStrokeOpacityLabel();
+        }
+        return;
+    }
 
     // Synchronise la transparence affichée avec l'objet sélectionné.
     // Pour une image avec bordure liée, la transparence correspond à la bordure.
@@ -297,6 +307,14 @@ function syncControlsFromSelectedObject() {
 /* =====================================================
    MODIFICATION COULEUR / ÉPAISSEUR
 ===================================================== */
+
+function getMagnifierBorderRgba(hexColor, alpha) {
+    const hex = String(hexColor || "#000000").replace("#", "");
+    const rgb = hex.length === 3
+        ? hex.split("").map(value => parseInt(value + value, 16))
+        : [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+    return `rgba(${rgb.join(",")},${Math.max(0, Math.min(1, Number(alpha) || 0))})`;
+}
 
 function updateSelectedObject(source = null) {
 
@@ -479,6 +497,20 @@ function updateSelectedObject(source = null) {
         canvas.requestRenderAll();
         saveHistory();
         updateStatus("Style appliqué aux objets sélectionnés");
+        return;
+    }
+
+    // Pour une loupe, couleur, épaisseur et transparence ne modifient
+    // que la bordure active de l'élément sélectionné (source OU lentille).
+    if (object.fuzeMagnifierId && ["source", "lens"].includes(object.fuzeMagnifierRole)) {
+        const color = source === "color" ? getColor() : (object.fuzeMagnifierBorderColor || getColor());
+        const width = source === "strokeWidth" ? getStrokeWidth() : (object.fuzeMagnifierBorderWidth || 1);
+        const opacity = source === "opacity" ? getStrokeOpacity() : (object.fuzeMagnifierBorderOpacity ?? 1);
+        if (typeof setMagnifierBorderStyle === "function") {
+            setMagnifierBorderStyle(object, color, width, opacity);
+            saveHistory();
+            updateStatus("Bordure de la loupe modifiée");
+        }
         return;
     }
 

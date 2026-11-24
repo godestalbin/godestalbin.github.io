@@ -496,91 +496,57 @@ function getCanvasPastePoint() {
 ===================================================== */
 
 document.addEventListener("paste", async (event) => {
-
     const items = event.clipboardData?.items;
+    if (!items) return;
 
-    if (!items) {
-        return;
-    }
-
+    // Une image copiée depuis une autre application après un Ctrl+C dans
+    // Fuze doit devenir le contenu le plus récent : elle est donc prioritaire.
     for (const item of items) {
-
-        // Priorité au presse-papiers système : une image copiée depuis
-        // Chrome doit passer avant les objets précédemment copiés dans Fuze.
-        if (!item.type.startsWith("image/")) {
-            continue;
-        }
-
-        event.preventDefault();
+        if (!item.type.startsWith("image/")) continue;
 
         const file = item.getAsFile();
+        if (!file) continue;
 
-        if (!file) {
-            continue;
-        }
-
+        event.preventDefault();
         try {
-
             const dataUrl = await new Promise((resolve, reject) => {
-
                 const reader = new FileReader();
-
                 reader.onload = () => resolve(reader.result);
                 reader.onerror = reject;
-
                 reader.readAsDataURL(file);
             });
 
-            const img =
-                await fabric.FabricImage.fromURL(dataUrl);
-
-            // Applique le même réglage que pour les images chargées.
-            // « No resize » conserve la taille originale de l'image.
+            const img = await fabric.FabricImage.fromURL(dataUrl);
             const scale = getImageImportScale();
-
             const pastePoint = getCanvasPastePoint();
 
             img.set({
                 scaleX: scale,
                 scaleY: scale,
-
                 left: pastePoint.x,
                 top: pastePoint.y,
-
                 originX: "center",
                 originY: "center",
-
                 selectable: true,
                 evented: true
             });
 
             canvas.add(img);
-
             canvas.setActiveObject(img);
             canvas.renderAll();
-
             saveHistory();
-
             updateEmptyMessage();
-
             updateStatus("Image collée depuis le presse-papiers");
-
         } catch (error) {
-
-            console.error(
-                "Erreur lors du collage de l'image :",
-                error
-            );
-
+            console.error("Erreur lors du collage de l'image :", error);
             updateStatus("Impossible de coller l'image");
         }
-
-        // Une seule image par collage
-        return;
+        return; // Une seule image par collage.
     }
 
-    // Aucun contenu image dans le presse-papiers système : on conserve
-    // alors le collage des objets copiés à l'intérieur de Fuze.
+    // Sans image système, coller le dernier objet copié dans Fuze.
+    // Le presse-papiers système est vidé lors d'un Ctrl+C interne ; une
+    // copie externe ultérieure (image) passe donc toujours dans le bloc ci-dessus.
     if (!(editingText && editingText.isEditing) &&
         typeof pasteCopiedObjects === "function" &&
         window.__fuzeHasObjectClipboard?.()) {

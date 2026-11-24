@@ -18,10 +18,11 @@
 
     function getStrokeObjects() {
         return canvas.getActiveObjects().filter(object =>
+            !object.fuzeMagnifierId && (
             isEditableArrow(object) ||
             object.type === "rect" ||
             object.type === "ellipse" ||
-            object.type === "path"
+            object.type === "path")
         );
     }
 
@@ -203,8 +204,23 @@
 
     function addBorderToSelectedImage() {
         const image = canvas.getActiveObject();
-        if (!image || image.type !== "image") {
-            updateStatus("Sélectionnez d’abord une image");
+        if (!image) {
+            updateStatus("Sélectionnez une image ou une boîte de zoom");
+            return;
+        }
+
+        // Les deux éléments d'une loupe (zone source et zone grossie)
+        // possèdent chacun leur bordure, activable indépendamment.
+        if (image.fuzeMagnifierId && ["source", "lens"].includes(image.fuzeMagnifierRole)) {
+            if (typeof toggleMagnifierBorder === "function" && toggleMagnifierBorder(image)) {
+                saveHistory();
+                updateStatus(image.fuzeMagnifierBorderEnabled ? "Bordure ajoutée" : "Bordure supprimée");
+            }
+            return;
+        }
+
+        if (image.type !== "image") {
+            updateStatus("Sélectionnez une image ou une boîte de zoom");
             return;
         }
 
@@ -324,6 +340,73 @@
         }
     }
 
+    // Restaure les rôles non interactifs des éléments décoratifs de bordure.
+    // Fabric n'enregistre pas selectable/evented dans toObject(): après un
+    // rechargement, la bordure et son support d'ombre redeviendraient déplaçables.
+    // Les anciens fichiers .fuze n'ont pas fuzeBorderShadowOwnerId : on retrouve
+    // alors le support noir par sa position, sa taille, son ombre et son ordre.
+    function restoreFuzeBorderObjects() {
+        const objects = canvas.getObjects();
+        const images = objects.filter(object =>
+            object.type === "image" && object.fuzeBorderId
+        );
+
+        images.forEach(image => {
+            const id = image.fuzeBorderId;
+            const border = objects.find(object =>
+                object.fuzeBorderOwnerId === id
+            );
+            if (!border) return;
+
+            border.set({
+                selectable: false,
+                evented: false,
+                hasControls: false,
+                hasBorders: false,
+                hoverCursor: "default"
+            });
+            border.setCoords();
+
+            let backing = objects.find(object =>
+                object.fuzeBorderShadowOwnerId === id
+            );
+
+            // Compatibilité avec les fichiers enregistrés avant la sauvegarde
+            // de fuzeBorderShadowOwnerId.
+            if (!backing) {
+                const borderIndex = objects.indexOf(border);
+                const imageIndex = objects.indexOf(image);
+                const borderBounds = border.getBoundingRect();
+                const candidates = objects.filter((object, index) => {
+                    if (index >= imageIndex || index >= borderIndex) return false;
+                    if (object === image || object === border || object.type !== "rect") return false;
+                    if (!object.shadow || String(object.fill).toLowerCase() !== "#000000") return false;
+                    return Math.abs(object.left - border.left) < 1.5 &&
+                        Math.abs(object.top - border.top) < 1.5 &&
+                        Number(object.width) >= Number(border.width) + 2 &&
+                        Number(object.height) >= Number(border.height) + 2;
+                });
+                candidates.sort((a, b) =>
+                    (Number(a.width) * Number(a.height)) -
+                    (Number(b.width) * Number(b.height))
+                );
+                backing = candidates[0] || null;
+            }
+
+            if (backing) {
+                backing.fuzeBorderShadowOwnerId = id;
+                backing.set({
+                    selectable: false,
+                    evented: false,
+                    hasControls: false,
+                    hasBorders: false,
+                    hoverCursor: "default"
+                });
+                backing.setCoords();
+            }
+        });
+    }
+
     function updateImageBorderStyle(image, color = getColor(), width = getStrokeWidth()) {
         if (!image || image.type !== "image" || !image.fuzeBorderId) return;
         const border = canvas.getObjects().find(obj => obj.fuzeBorderOwnerId === image.fuzeBorderId);
@@ -365,6 +448,14 @@
         canvas.upperCanvasEl.style.cursor = "crosshair";
     });
 
+    // Ctrl+Enter validates the stamp text without requiring a click on the button.
+    stampTextInput?.addEventListener("keydown", event => {
+        if (event.key !== "Enter" || !event.ctrlKey || event.altKey || event.metaKey) return;
+        event.preventDefault();
+        event.stopPropagation();
+        stampForm?.requestSubmit();
+    });
+
     document.getElementById("closeStampButton")?.addEventListener("click", () => closeStampDialog(true));
     document.getElementById("cancelStampButton")?.addEventListener("click", () => closeStampDialog(true));
     stampModal?.addEventListener("click", event => { if (event.target === stampModal) closeStampDialog(true); });
@@ -396,7 +487,19 @@
         const inset = strokeWidth / 2;
         const radius = Math.max(7, Math.min(fontSize * 0.2, height * 0.18));
         const frame = `<rect x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}" rx="${radius}" ry="${radius}" fill="none" stroke="${color}" stroke-width="${strokeWidth}"/>`;
-        const firstBaseline = (height - (lines.length - 1) * lineHeight) / 2 + fontSize * 0.34;
+        // Center the *visible glyph bounds*, not the font's nominal em box.
+        // A fixed baseline offset (fontSize * 0.34) leaves progressively more
+        // empty space below the text as the font grows. Canvas text metrics give
+        // us the actual ascent/descent for the selected font at this size.
+        const textMetrics = measureContext.measureText(lines[0] || "M");
+        const ascent = Number.isFinite(textMetrics.actualBoundingBoxAscent)
+            ? textMetrics.actualBoundingBoxAscent
+            : fontSize * 0.78;
+        const descent = Number.isFinite(textMetrics.actualBoundingBoxDescent)
+            ? textMetrics.actualBoundingBoxDescent
+            : fontSize * 0.18;
+        const visibleTextBlockHeight = ascent + descent + (lines.length - 1) * lineHeight;
+        const firstBaseline = (height - visibleTextBlockHeight) / 2 + ascent;
         const textMarkup = lines.map((line, index) =>
             `<text x="${width / 2}" y="${firstBaseline + index * lineHeight}" text-anchor="middle" font-family="Impact, Haettenschweiler, Arial Narrow, sans-serif" font-size="${fontSize}" font-weight="400" letter-spacing="0.5" fill="${color}">${escapeStampXml(line)}</text>`
         ).join("");
@@ -690,13 +793,8 @@
 
         canvas.isDrawingMode = false;
 
-        // Rectangle et cercle conservent l'épaisseur actuellement choisie.
-        // Seul le feutre garde son épaisseur initiale dédiée (10 px) lorsqu'on
-        // sélectionne cet outil ; sélectionner R ou C ne réinitialise jamais
-        // le réglage partagé.
-        if (tool === "felt" && Object.prototype.hasOwnProperty.call(DEFAULT_STROKE_WIDTHS, tool)) {
-            strokeWidthInput.value = String(DEFAULT_STROKE_WIDTHS[tool]);
-        }
+        // Le feutre utilise lui aussi l'épaisseur courante du contrôle partagé.
+        // Changer d'outil ne doit jamais réinitialiser cette valeur.
 
         if (tool === "select") {
 
@@ -707,7 +805,7 @@
                     // Les bordures d'image restent purement décoratives,
                     // même en mode Sélection : le clic traverse la bordure
                     // et cible directement l'image située dessous.
-                    const isDecoration = object.fuzeTool === "border" || object.fuzeBorderOwnerId || object.fuzeMagnifierRole === "connector";
+                    const isDecoration = object.fuzeTool === "border" || object.fuzeBorderOwnerId || object.fuzeMagnifierRole === "connector" || String(object.fuzeMagnifierRole || "").endsWith("-shadow") || String(object.fuzeMagnifierRole || "").endsWith("-border");
                     object.selectable = !isDecoration;
                     object.evented = !isDecoration;
                 }
@@ -730,7 +828,7 @@
                     // Les objets restent détectables (evented) pour distinguer
                     // un clic d'un glissement, mais ne sont pas déplaçables par
                     // Fabric tant qu'un outil de dessin est actif.
-                    const isDecoration = object.fuzeTool === "border" || object.fuzeBorderOwnerId || object.fuzeMagnifierRole === "connector";
+                    const isDecoration = object.fuzeTool === "border" || object.fuzeBorderOwnerId || object.fuzeMagnifierRole === "connector" || String(object.fuzeMagnifierRole || "").endsWith("-shadow") || String(object.fuzeMagnifierRole || "").endsWith("-border");
                     object.selectable = false;
                     object.evented = !isDecoration;
                 }
@@ -2968,6 +3066,10 @@
                 left: object.left, top: object.top,
                 width: object.width * (object.scaleX || 1),
                 height: object.height * (object.scaleY || 1)
+            }, {
+                color: getColor(),
+                width: getStrokeWidth(),
+                opacity: getStrokeOpacity()
             });
             updateEmptyMessage();
             return;
@@ -3697,6 +3799,10 @@
 
                     fontWeight:
                         "500",
+
+                    // Les nouveaux textes sont centrés par défaut.
+                    textAlign:
+                        "center",
 
                     editable:
                         true,

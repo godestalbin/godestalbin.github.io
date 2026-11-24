@@ -317,7 +317,20 @@ async function copySelectedObjects() {
     const selected = getClipboardSourceObjects();
     if (!selected.length) return;
 
+    // Ctrl+C dans Fuze remplace aussi le contenu système précédent.
+    // Sinon une ancienne image copiée depuis Windows/Chrome reste présente
+    // et peut être confondue avec une image copiée après l'objet Fuze.
+    // On vide le presse-papiers système pendant le geste utilisateur ; si
+    // l'utilisateur copie ensuite une image externe, celle-ci le remplacera.
+    let clearSystemClipboard = Promise.resolve();
+    if (navigator.clipboard?.writeText) {
+        clearSystemClipboard = navigator.clipboard.writeText("").catch(error => {
+            console.warn("Impossible de vider le presse-papiers système :", error);
+        });
+    }
+
     try {
+        await clearSystemClipboard;
         // ActiveSelection place temporairement ses objets dans le repère du
         // groupe. La désélection les remet dans le repère du canvas avant clone.
         const hadMultipleSelection = canvas.getActiveObject()?.type === "activeselection";
@@ -619,6 +632,43 @@ document.addEventListener("keydown", event => {
 
     const key = event.key.toLowerCase();
 
+    // J : faire défiler la justification du texte sélectionné.
+    // Le raccourci n'intervient pas pendant la saisie du texte (gérée plus
+    // haut par le contrôle contenteditable de Fabric).
+    if (
+        !event.ctrlKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        !event.shiftKey &&
+        key === "j"
+    ) {
+        const selectedObject = canvas.getActiveObject();
+        const isTextObject = selectedObject &&
+            ["i-text", "text", "textbox"].includes(selectedObject.type);
+
+        if (isTextObject && !(editingText && editingText.isEditing)) {
+            event.preventDefault();
+
+            const alignments = ["center", "left", "right"];
+            const currentIndex = alignments.indexOf(selectedObject.textAlign || "left");
+            const nextAlignment = alignments[(currentIndex + 1) % alignments.length];
+
+            selectedObject.set("textAlign", nextAlignment);
+            selectedObject.initDimensions();
+            selectedObject.setCoords();
+            canvas.requestRenderAll();
+            saveHistory();
+
+            const alignmentLabels = {
+                center: FUZE_LANGUAGE === "en" ? "Centered" : "Centré",
+                left: FUZE_LANGUAGE === "en" ? "Left justified" : "Aligné à gauche",
+                right: FUZE_LANGUAGE === "en" ? "Right justified" : "Aligné à droite"
+            };
+            updateStatus(alignmentLabels[nextAlignment]);
+            return;
+        }
+    }
+
     // Ctrl+A : sélectionner tous les éléments présents sur le canvas.
     // Les poignées des flèches sont des éléments HTML et ne font donc pas
     // partie de canvas.getObjects(). On exclut seulement l'objet temporaire
@@ -738,6 +788,14 @@ document.addEventListener("keydown", event => {
     if (!event.ctrlKey && !event.altKey && !event.metaKey && event.shiftKey && key === "a") {
         event.preventDefault();
         setTool("simpleArrow");
+        document.querySelectorAll(".toolbar-menu").forEach(menu => menu.removeAttribute("open"));
+        return;
+    }
+
+    // Pipette : P active/désactive le prélèvement de couleur.
+    if (!event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey && key === "p") {
+        event.preventDefault();
+        activateEyedropper();
         document.querySelectorAll(".toolbar-menu").forEach(menu => menu.removeAttribute("open"));
         return;
     }

@@ -11,6 +11,186 @@ const magnifierRemoving = new Set();
 const magnifierGeometrySyncing = new Set();
 const magnifierSnapshotRefreshing = new Set();
 
+
+function magnifierRgba(color, alpha) {
+    const value = String(color || "#4673d2").trim();
+    const match = value.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (match) {
+        const hex = match[1].length === 3 ? match[1].split("").map(c => c + c).join("") : match[1];
+        return `rgba(${parseInt(hex.slice(0, 2), 16)},${parseInt(hex.slice(2, 4), 16)},${parseInt(hex.slice(4, 6), 16)},${alpha})`;
+    }
+    const rgb = value.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    return rgb ? `rgba(${rgb[1]},${rgb[2]},${rgb[3]},${alpha})` : `rgba(70,115,210,${alpha})`;
+}
+
+function getMagnifierBorderParts(object) {
+    if (!object?.fuzeMagnifierId) return {};
+    const objects = canvas.getObjects().filter(item => item.fuzeMagnifierId === object.fuzeMagnifierId);
+    return {
+        // La bordure est désormais le stroke de l'objet lui-même.
+        shadow: objects.find(item => item.fuzeMagnifierRole === `${object.fuzeMagnifierRole}-shadow`)
+    };
+}
+
+function syncMagnifierBorder(object) {
+    if (!object || !["source", "lens"].includes(object.fuzeMagnifierRole)) return;
+    const { shadow } = getMagnifierBorderParts(object);
+    if (!shadow) return;
+    const bounds = object.getBoundingRect();
+    const frameWidth = object.fuzeMagnifierBorderEnabled === false
+        ? 1
+        : Math.max(1, Number(object.fuzeMagnifierBorderWidth) || 1);
+    // Décaler le trait d'une demi-épaisseur vers le haut et la gauche,
+    // sans déplacer ni redimensionner le cadre de sélection.
+    const frameWidthPx = Math.max(1, bounds.width - frameWidth);
+    const frameHeightPx = Math.max(1, bounds.height - frameWidth);
+    const radius = Math.min(14, Math.max(4, Math.min(bounds.width, bounds.height) * 0.04));
+    shadow.set({
+        left: bounds.left, top: bounds.top,
+        width: frameWidthPx, height: frameHeightPx,
+        rx: radius, ry: radius,
+        originX: "left", originY: "top"
+    });
+    shadow.setCoords();
+}
+
+function setMagnifierBorderStyle(object, color, width, opacity) {
+    if (!object || !["source", "lens"].includes(object.fuzeMagnifierRole)) return;
+    object.fuzeMagnifierBorderColor = color || object.fuzeMagnifierBorderColor || "#4673d2";
+    object.fuzeMagnifierBorderWidth = Number.isFinite(Number(width)) ? Math.max(1, Number(width)) : (object.fuzeMagnifierBorderWidth || 1);
+    object.fuzeMagnifierBorderOpacity = Number.isFinite(Number(opacity)) ? Number(opacity) : (object.fuzeMagnifierBorderOpacity ?? 1);
+    const style = {
+        stroke: object.fuzeMagnifierBorderEnabled === false
+            ? (object.fuzeMagnifierRole === "lens" ? magnifierRgba(object.fuzeMagnifierBorderColor, object.fuzeMagnifierBorderOpacity ?? 0.85) : null)
+            : magnifierRgba(object.fuzeMagnifierBorderColor, object.fuzeMagnifierBorderOpacity),
+        // La lentille est une fabric.Image : son stroke natif doit rester à 0.
+        // Le cadre arrondi séparé porte seul la bordure, sinon Fabric inclut
+        // strokeWidth dans ses dimensions et la lentille grandit à chaque refresh.
+        strokeWidth: object.fuzeMagnifierRole === "lens" ? 0 : (
+            object.fuzeMagnifierBorderEnabled === false ? 0 : object.fuzeMagnifierBorderWidth
+        ),
+        strokeUniform: true,
+        objectCaching: false
+    };
+    if (object.fuzeMagnifierRole === "source") style.fill = magnifierRgba(object.fuzeMagnifierBorderColor, 0.16);
+    // Le contour arrondi de la lentille est dessiné par son cadre dédié afin
+    // d'éviter le stroke rectangulaire natif de fabric.Image.
+    if (object.fuzeMagnifierRole === "lens") style.stroke = null;
+    object.set(style);
+    object.setCoords();
+    const { shadow } = getMagnifierBorderParts(object);
+    if (shadow) {
+        const frameColor = magnifierRgba(object.fuzeMagnifierBorderColor, object.fuzeMagnifierBorderEnabled ? object.fuzeMagnifierBorderOpacity : 0.85);
+        shadow.set({ stroke: frameColor, strokeWidth: object.fuzeMagnifierBorderEnabled ? object.fuzeMagnifierBorderWidth : 1, visible: true });
+        syncMagnifierBorder(object);
+    }
+    const { lens, connector } = getMagnifierParts(object.fuzeMagnifierId);
+    if (lens && connector) {
+        const c = magnifierRgba(lens.fuzeMagnifierBorderColor || "#4673d2", (lens.fuzeMagnifierBorderOpacity ?? 1) * 0.30);
+        connector.set({ fill: c, stroke: c });
+    }
+    canvas.requestRenderAll();
+}
+
+function toggleMagnifierBorder(object) {
+    if (!object || !["source", "lens"].includes(object.fuzeMagnifierRole)) return false;
+    object.fuzeMagnifierBorderEnabled = object.fuzeMagnifierBorderEnabled !== true;
+    const enabling = object.fuzeMagnifierBorderEnabled;
+    // À l'activation, reprendre systématiquement les réglages courants du bandeau.
+    // À la désactivation de la lentille, conserver un filet discret de 1 px pour
+    // que la zone agrandie reste toujours visuellement délimitée.
+    const color = enabling ? getColor() : (object.fuzeMagnifierBorderColor || "#4673d2");
+    const width = enabling ? getStrokeWidth() : 1;
+    const opacity = enabling ? getStrokeOpacity() : 0.85;
+    setMagnifierBorderStyle(object, color, width, opacity);
+    return true;
+}
+
+function restoreMagnifierDecorations() {
+    if (!canvas) return;
+    const all = canvas.getObjects();
+    all.forEach(object => {
+        if (!object.fuzeMagnifierId) return;
+        const role = String(object.fuzeMagnifierRole || "");
+        if (role.endsWith("-border")) {
+            // Migration : rapatrier l'ancien rectangle de bordure sur l'objet.
+            const baseRole = role.slice(0, -7);
+            const base = all.find(item => item.fuzeMagnifierId === object.fuzeMagnifierId && item.fuzeMagnifierRole === baseRole);
+            if (base) {
+                base.fuzeMagnifierBorderEnabled = object.visible !== false;
+                base.fuzeMagnifierBorderColor = base.fuzeMagnifierBorderColor || object.stroke || "#4673d2";
+                base.fuzeMagnifierBorderWidth = base.fuzeMagnifierBorderWidth || object.strokeWidth || 1;
+                base.fuzeMagnifierBorderOpacity = base.fuzeMagnifierBorderOpacity ?? object.opacity ?? 1;
+                base.set({ stroke: base.fuzeMagnifierBorderEnabled ? magnifierRgba(base.fuzeMagnifierBorderColor, base.fuzeMagnifierBorderOpacity) : null,
+                    strokeWidth: base.fuzeMagnifierBorderEnabled ? base.fuzeMagnifierBorderWidth : 0, strokeUniform: true });
+            }
+            canvas.remove(object);
+        } else if (role.endsWith("-shadow")) {
+            object.set({ selectable: false, evented: false, hasControls: false, hasBorders: false, hoverCursor: "default" });
+        }
+    });
+
+    const bases = canvas.getObjects().filter(object => object.fuzeMagnifierId && ["source", "lens"].includes(object.fuzeMagnifierRole));
+    bases.forEach(object => {
+        object.fuzeMagnifierBorderColor = object.fuzeMagnifierBorderColor || "#4673d2";
+        object.fuzeMagnifierBorderWidth = Number(object.fuzeMagnifierBorderWidth || 1) || 1;
+        object.fuzeMagnifierBorderOpacity = object.fuzeMagnifierBorderOpacity ?? 1;
+        if (typeof object.fuzeMagnifierBorderEnabled !== "boolean") object.fuzeMagnifierBorderEnabled = object.fuzeMagnifierRole === "lens";
+        object.set({
+            stroke: object.fuzeMagnifierRole === "lens" ? null : (object.fuzeMagnifierBorderEnabled ? magnifierRgba(object.fuzeMagnifierBorderColor, object.fuzeMagnifierBorderOpacity) : null),
+            strokeWidth: object.fuzeMagnifierRole === "lens" ? 0 : (object.fuzeMagnifierBorderEnabled ? object.fuzeMagnifierBorderWidth : 0),
+            strokeUniform: true, objectCaching: false, selectable: currentTool === "select", evented: true,
+            perPixelTargetFind: false
+        });
+        object.setCoords();
+        const { shadow } = getMagnifierBorderParts(object);
+        if (shadow && object.fuzeMagnifierRole === "lens") {
+            shadow.set({
+                stroke: magnifierRgba(object.fuzeMagnifierBorderColor, object.fuzeMagnifierBorderEnabled ? object.fuzeMagnifierBorderOpacity : 0.85),
+                strokeWidth: object.fuzeMagnifierBorderEnabled ? object.fuzeMagnifierBorderWidth : 1,
+                visible: true
+            });
+            syncMagnifierBorder(object);
+        }
+    });
+    canvas.requestRenderAll();
+}
+
+function createMagnifierBorder(object, role, enabled, withShadow = false) {
+    // La bordure est intégrée au rectangle / à l'image : aucun objet distinct.
+    object.fuzeMagnifierBorderEnabled = !!enabled;
+    object.set({
+        stroke: enabled ? magnifierRgba(object.fuzeMagnifierBorderColor || "#4673d2", object.fuzeMagnifierBorderOpacity ?? 1) : null,
+        strokeWidth: role === "lens" ? 0 : (enabled ? (object.fuzeMagnifierBorderWidth || 1) : 0),
+        strokeUniform: true
+    });
+    if (withShadow) {
+        const bounds = object.getBoundingRect();
+        const radius = Math.min(14, Math.max(4, Math.min(bounds.width, bounds.height) * 0.04));
+        const shadow = new fabric.Rect({
+            left: bounds.left,
+            top: bounds.top,
+            width: Math.max(1, bounds.width - (object.fuzeMagnifierBorderEnabled === false ? 1 : (object.fuzeMagnifierBorderWidth || 1))),
+            height: Math.max(1, bounds.height - (object.fuzeMagnifierBorderEnabled === false ? 1 : (object.fuzeMagnifierBorderWidth || 1))),
+            originX: "left", originY: "top",
+            rx: radius,
+            ry: radius,
+            fill: "rgba(0,0,0,0.001)",
+            stroke: magnifierRgba(object.fuzeMagnifierBorderColor || "#4673d2", object.fuzeMagnifierBorderEnabled === false ? 0.85 : (object.fuzeMagnifierBorderOpacity ?? 1)),
+            strokeWidth: object.fuzeMagnifierBorderEnabled === false ? 1 : (object.fuzeMagnifierBorderWidth || 1),
+            strokeUniform: true,
+            shadow: new fabric.Shadow({ color: "rgba(0,0,0,0.48)", blur: 8, offsetX: 0, offsetY: 0 }),
+            selectable: false, evented: false, hasControls: false, hasBorders: false,
+            objectCaching: false, fuzeMagnifierId: object.fuzeMagnifierId,
+            fuzeMagnifierRole: `${role}-shadow`
+        });
+        canvas.add(shadow);
+        // Le cadre est au-dessus de l'image, mais non interactif : le clic
+        // traverse jusqu'à la lentille sélectionnable.
+        canvas.moveObjectTo(shadow, Math.min(canvas.getObjects().length - 1, canvas.getObjects().indexOf(object) + 1));
+    }
+}
+
 function getMagnifierParts(id) {
     const objects = canvas.getObjects().filter(object => object.fuzeMagnifierId === id);
     return {
@@ -138,8 +318,8 @@ function buildMagnifierConnector(source, lens, id) {
     const connector = new fabric.Polygon(
         points.map(point => ({ x: point.x, y: point.y })),
         {
-            fill: "rgba(70, 115, 210, 0.18)",
-            stroke: "rgba(45, 80, 155, 0.55)",
+            fill: (() => { const { lens } = getMagnifierParts(id); return magnifierRgba(lens?.fuzeMagnifierBorderColor || "#4673d2", (lens?.fuzeMagnifierBorderOpacity ?? 1) * 0.30); })(),
+            stroke: "rgba(0,0,0,0)",
             strokeWidth: 1,
             strokeUniform: true,
             selectable: false,
@@ -170,6 +350,8 @@ function syncMagnifierGeometry(id) {
         source.setCoords();
         lens.setCoords();
         buildMagnifierConnector(source, lens, id);
+        syncMagnifierBorder(source);
+        syncMagnifierBorder(lens);
         canvas.requestRenderAll();
     } finally {
         magnifierGeometrySyncing.delete(id);
@@ -177,44 +359,110 @@ function syncMagnifierGeometry(id) {
 }
 
 async function refreshMagnifierSnapshot(id) {
-    // Une modification peut déclencher plusieurs événements Fabric rapprochés.
-    // Une seule capture/actualisation par loupe est autorisée à la fois.
-    if (magnifierSnapshotRefreshing.has(id)) return;
-    const { source, lens } = getMagnifierParts(id);
-    if (!source || !lens) return;
-
-    magnifierSnapshotRefreshing.add(id);
+    // Un seul rafraîchissement par loupe. Toute nouvelle modification
+    // invalide la capture en cours ; le worker recommence avec la géométrie
+    // la plus récente (déplacement ET redimensionnement).
     const token = (magnifierRefreshTokens.get(id) || 0) + 1;
     magnifierRefreshTokens.set(id, token);
-    const desiredWidth = lens.getScaledWidth();
-    const desiredHeight = lens.getScaledHeight();
+    if (magnifierSnapshotRefreshing.has(id)) return;
 
+    magnifierSnapshotRefreshing.add(id);
     try {
-        const dataUrl = captureMagnifierSource(source, id);
-        if (!dataUrl) return;
-        const replacementElement = await fabric.util.loadImage(dataUrl);
-        if (magnifierRefreshTokens.get(id) !== token) return;
-        const current = getMagnifierParts(id);
-        if (!current.source || !current.lens) return;
+        while (true) {
+            const currentToken = magnifierRefreshTokens.get(id);
+            const { source, lens } = getMagnifierParts(id);
+            if (!source || !lens) return;
 
-        current.lens.setElement(replacementElement);
-        current.lens.set({
-            scaleX: desiredWidth / Math.max(1, replacementElement.width),
-            scaleY: desiredHeight / Math.max(1, replacementElement.height),
-            selectable: true,
-            evented: true
-        });
-        current.lens.setCoords();
-        syncMagnifierGeometry(id);
-        // saveHistory est déjà appelé par le gestionnaire object:modified.
+            source.setCoords();
+            const captureBounds = magnifierBounds(source);
+            const dataUrl = captureMagnifierSource(source, id);
+            if (!dataUrl) return;
+
+            const replacementElement = await fabric.util.loadImage(dataUrl);
+
+            // Ne jamais appliquer une capture si la source a changé pendant
+            // le chargement de son image.
+            if (magnifierRefreshTokens.get(id) !== currentToken) continue;
+
+            const latest = getMagnifierParts(id);
+            if (!latest.source || !latest.lens) return;
+
+            latest.source.setCoords();
+            const latestBounds = magnifierBounds(latest.source);
+            // Sécurité supplémentaire : si la géométrie a changé sans que
+            // l'événement ait incrémenté le jeton, refaire une capture.
+            if (Math.abs(latestBounds.left - captureBounds.left) > 0.01 ||
+                Math.abs(latestBounds.top - captureBounds.top) > 0.01 ||
+                Math.abs(latestBounds.width - captureBounds.width) > 0.01 ||
+                Math.abs(latestBounds.height - captureBounds.height) > 0.01) {
+                magnifierRefreshTokens.set(id, currentToken + 1);
+                continue;
+            }
+
+            const targetLens = latest.lens;
+            const oldCenter = targetLens.getCenterPoint();
+            const magnification = Math.max(1, Number(latest.source.fuzeMagnifierScale) || 2);
+            const maxWidth = Math.max(1, CANVAS_WIDTH - 16);
+            const maxHeight = Math.max(1, CANVAS_HEIGHT - 16);
+            const targetWidth = Math.min(latestBounds.width * magnification, maxWidth);
+            const targetHeight = Math.min(latestBounds.height * magnification, maxHeight);
+            const scale = Math.min(
+                targetWidth / Math.max(1, replacementElement.width),
+                targetHeight / Math.max(1, replacementElement.height)
+            );
+            const actualWidth = replacementElement.width * scale;
+            const actualHeight = replacementElement.height * scale;
+
+            targetLens.setElement(replacementElement);
+            targetLens.set({
+                originX: "left",
+                originY: "top",
+                scaleX: scale,
+                scaleY: scale,
+                left: oldCenter.x - actualWidth / 2,
+                top: oldCenter.y - actualHeight / 2,
+                clipPath: new fabric.Rect({
+                    width: replacementElement.width,
+                    height: replacementElement.height,
+                    rx: Math.min(12 / scale, replacementElement.width / 2, replacementElement.height / 2),
+                    ry: Math.min(12 / scale, replacementElement.width / 2, replacementElement.height / 2),
+                    originX: "center",
+                    originY: "center"
+                }),
+                selectable: true,
+                evented: true,
+                objectCaching: false
+            });
+
+            // Garder la lentille dans le canvas après un agrandissement.
+            const finalLeft = Math.max(0, Math.min(CANVAS_WIDTH - actualWidth, targetLens.left));
+            const finalTop = Math.max(0, Math.min(CANVAS_HEIGHT - actualHeight, targetLens.top));
+            targetLens.set({ left: finalLeft, top: finalTop });
+            targetLens.setCoords();
+            syncMagnifierGeometry(id);
+
+            if (magnifierRefreshTokens.get(id) === currentToken) break;
+        }
     } catch (error) {
         console.error("Fuze magnifier: impossible d'actualiser la zone source", error);
     } finally {
         magnifierSnapshotRefreshing.delete(id);
+        // Une modification peut arriver juste au moment où le worker se
+        // termine. Ne pas laisser cette dernière demande sans traitement.
+        const completedToken = magnifierRefreshTokens.get(id);
+        if (completedToken !== undefined && !magnifierRemoving.has(id)) {
+            const { source, lens } = getMagnifierParts(id);
+            if (source && lens && source.__fuzeMagnifierLastRefreshToken !== completedToken) {
+                source.__fuzeMagnifierLastRefreshToken = completedToken;
+            }
+        }
     }
 }
 
-async function finishMagnifierDrawing(rect) {
+async function finishMagnifierDrawing(rect, style = {}) {
+    const color = style.color || getColor();
+    const strokeWidth = Number(style.width) || 1;
+    const opacity = Number.isFinite(Number(style.opacity)) ? Number(style.opacity) : 1;
     const left = Math.min(rect.left, rect.left + rect.width);
     const top = Math.min(rect.top, rect.top + rect.height);
     const width = Math.abs(rect.width);
@@ -225,20 +473,27 @@ async function finishMagnifierDrawing(rect) {
     }
 
     const id = `magnifier-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const sourceRadius = Math.min(12, width / 2, height / 2);
     const source = new fabric.Rect({
         left, top, width, height,
+        rx: sourceRadius, ry: sourceRadius,
         originX: "left", originY: "top",
-        fill: "rgba(70, 115, 210, 0.30)",
-        stroke: "rgba(35, 65, 135, 0.95)",
-        strokeWidth: 1,
+        fill: magnifierRgba(color, 0.16),
+        stroke: null,
+        strokeWidth: 0,
         strokeUniform: true,
         objectCaching: false,
         selectable: true,
         evented: true,
+        perPixelTargetFind: false,
         lockRotation: true,
         fuzeTool: "magnifier",
         fuzeMagnifierId: id,
-        fuzeMagnifierRole: "source"
+        fuzeMagnifierRole: "source",
+        fuzeMagnifierBorderEnabled: false,
+        fuzeMagnifierBorderColor: color,
+        fuzeMagnifierBorderWidth: strokeWidth,
+        fuzeMagnifierBorderOpacity: opacity
     });
 
     // Capturer le contenu du canvas avant d'ajouter les éléments de la loupe.
@@ -269,19 +524,35 @@ async function finishMagnifierDrawing(rect) {
             originY: "top",
             scaleX: scale,
             scaleY: scale,
-            stroke: "rgba(35, 65, 135, 0.95)",
-            strokeWidth: 1,
+            // Le masque arrondi découpe réellement l'image de la lentille.
+            clipPath: new fabric.Rect({
+                width: element.width,
+                height: element.height,
+                rx: Math.min(12 / scale, element.width / 2, element.height / 2),
+                ry: Math.min(12 / scale, element.width / 2, element.height / 2),
+                originX: "center",
+                originY: "center"
+            }),
+            stroke: null,
+            strokeWidth: 0,
             strokeUniform: true,
             objectCaching: false,
             selectable: true,
             evented: true,
+            perPixelTargetFind: false,
             lockRotation: true,
             fuzeTool: "magnifier",
             fuzeMagnifierId: id,
-            fuzeMagnifierRole: "lens"
+            fuzeMagnifierRole: "lens",
+            fuzeMagnifierBorderEnabled: true,
+            fuzeMagnifierBorderColor: color,
+            fuzeMagnifierBorderWidth: strokeWidth,
+            fuzeMagnifierBorderOpacity: opacity
         });
 
         canvas.add(source, lens);
+        createMagnifierBorder(source, "source", false, false);
+        createMagnifierBorder(lens, "lens", true, true);
         buildMagnifierConnector(source, lens, id);
         source.setCoords();
         lens.setCoords();

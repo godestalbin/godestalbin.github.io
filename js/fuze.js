@@ -107,6 +107,10 @@ async function loadFuzeDocumentText(text, fileName, handle = null) {
     restoringHistory = true;
     try {
         await canvas.loadFromJSON(documentData.canvas.data);
+        // Rétablit les rôles image/bordure/support d'ombre. Cette étape est
+        // nécessaire car Fabric ne sérialise pas selectable et evented.
+        restoreFuzeBorderObjects();
+        if (typeof restoreMagnifierDecorations === "function") restoreMagnifierDecorations();
         canvas.setDimensions({
             width: CANVAS_WIDTH * zoom,
             height: CANVAS_HEIGHT * zoom
