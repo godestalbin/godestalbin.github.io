@@ -3669,6 +3669,8 @@
             originX: "center",
             originY: "center",
             opacity,
+            // Même ombre extérieure que les formes (rectangle, cercle, flèche…).
+            shadow: makeOuterShapeShadow(),
             selectable: false,
             evented: false,
             objectCaching: false,
