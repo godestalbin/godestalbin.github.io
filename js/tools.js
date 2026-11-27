@@ -20,6 +20,7 @@
         return canvas.getActiveObjects().filter(object =>
             !object.fuzeMagnifierId && (
             isEditableArrow(object) ||
+            object.fuzeTool === "callout" ||
             object.type === "rect" ||
             object.type === "ellipse" ||
             object.type === "path")
@@ -27,6 +28,7 @@
     }
 
     function getObjectThickness(object) {
+        if (object.fuzeTool === "callout") return Number(object.fuzeCalloutStrokeWidth);
         if (isEditableArrow(object) || object.arrowType === "curved") return Number(object.arrowStrokeWidth ?? object.strokeWidth);
         return Number(object.strokeWidth);
     }
@@ -76,6 +78,11 @@
             offsetY: 0
         });
     }
+
+    let calloutDefaultOpacity = 0.3;
+    window.fuzeSetCalloutDefaultOpacity = value => {
+        if (Number.isFinite(value)) calloutDefaultOpacity = Math.max(0.1, Math.min(1, value));
+    };
 
     function getStrokeOpacity() {
         const value = Number(strokeOpacityInput?.value ?? 55);
@@ -636,7 +643,8 @@
         felt: 'url("./cursors/tool%20felt.png") 6 6, crosshair',
         highlight: 'url("./cursors/tool%20hightlight.png") 6 6, crosshair',
         blur: 'url("./cursors/tool%20blur.png") 6 6, crosshair',
-        magnifier: 'url("./cursors/tool%20zoom.png") 6 6, crosshair'
+        magnifier: 'url("./cursors/tool%20zoom.png") 6 6, crosshair',
+        callout: 'url("./cursors/tool%20callout.png") 6 6, crosshair'
     };
     const DEFAULT_TOOL_CURSOR = 'url("./cursors/tool%20default.png") 6 6, crosshair';
     const MOVE_CURSOR = 'url("./cursors/move.png") 23 23, default';
@@ -769,6 +777,17 @@
             updateEyedropperCursor();
         }
 
+        if (currentTool === "callout" && tool !== "callout") {
+            if (calloutPreview) canvas.remove(calloutPreview);
+            if (calloutAnchorPreview) canvas.remove(calloutAnchorPreview);
+            calloutPreview = null;
+            calloutAnchorPreview = null;
+            calloutDragStart = null;
+            calloutAnchor = null;
+            calloutStage = 0;
+            canvas.requestRenderAll();
+        }
+
         if (currentTool === "curvedArrow" && tool !== "curvedArrow") {
             if (temporaryObject) canvas.remove(temporaryObject);
             temporaryObject = null;
@@ -839,6 +858,7 @@
                 tool === "highlight" ? "Highlight : tracer un rectangle jaune" :
                 tool === "magnifier" ? (FUZE_LANGUAGE === "en" ? "Magnifier: draw the area to enlarge" : "Loupe : tracer la zone à agrandir") :
                 tool === "number" ? (FUZE_LANGUAGE === "en" ? "Number: click to add a circled number" : "Numéro : cliquez pour ajouter un numéro entouré") :
+                tool === "callout" ? (FUZE_LANGUAGE === "en" ? "Callout: click the anchor, then drag the text box" : "Bulle : cliquez le point d'ancrage, puis dessinez la boîte") :
                 "Outil : " + tool
             );
         }
@@ -3241,6 +3261,420 @@
     // et on déplace cet objet, sans démarrer un second tracé.
     let pendingObjectGesture = null;
     let shapeDrawGesture = null;
+    let calloutStage = 0;
+    let calloutAnchor = null;
+    let calloutDragStart = null;
+    let calloutPreview = null;
+    let calloutAnchorPreview = null;
+    let calloutWidthGesture = null;
+
+    // Géométrie indépendante de la bulle : le cadre Fabric ne contient que
+    // la boîte et le texte. La pointe et sa poignée restent des objets séparés.
+    function getCalloutTailPoints(rect, anchor) {
+        const left = rect.left, top = rect.top;
+        const right = left + rect.width, bottom = top + rect.height;
+        // La base est volontairement plus étroite que précédemment. On garde
+        // en plus une marge égale au rayon des coins arrondis (8 px), afin
+        // qu'elle ne puisse jamais déboucher dans un angle de la boîte.
+        const cornerRadius = 8;
+        const halfBase = 6;
+        const insetX = Math.min(cornerRadius + halfBase, rect.width / 2);
+        const insetY = Math.min(cornerRadius + halfBase, rect.height / 2);
+        const candidates = [
+            { edge: "top", x: Math.max(left + insetX, Math.min(right - insetX, anchor.x)), y: top },
+            { edge: "bottom", x: Math.max(left + insetX, Math.min(right - insetX, anchor.x)), y: bottom },
+            { edge: "left", x: left, y: Math.max(top + insetY, Math.min(bottom - insetY, anchor.y)) },
+            { edge: "right", x: right, y: Math.max(top + insetY, Math.min(bottom - insetY, anchor.y)) }
+        ];
+        candidates.forEach(p => p.distance = Math.hypot(anchor.x - p.x, anchor.y - p.y));
+        candidates.sort((a, b) => a.distance - b.distance);
+        const p = candidates[0];
+        let p1, p2;
+        if (p.edge === "top" || p.edge === "bottom") {
+            const y = p.y;
+            p1 = { x: p.x - halfBase, y };
+            p2 = { x: p.x + halfBase, y };
+        } else {
+            p1 = { x: p.x, y: p.y - halfBase };
+            p2 = { x: p.x, y: p.y + halfBase };
+        }
+        return [p1, p2, { x: anchor.x, y: anchor.y }];
+    }
+
+    // Le contour complet (boîte + pointe) est dessiné par un Path indépendant,
+    // placé juste sous le groupe. Le groupe conserve uniquement la boîte et le
+    // texte, ce qui permet de recalculer la flèche pendant le déplacement sans
+    // modifier l'origine ou les dimensions du groupe.
+    function getCalloutContourPath(rect, anchor) {
+        const left = rect.left, top = rect.top;
+        const right = left + rect.width, bottom = top + rect.height;
+        const radius = Math.min(8, rect.width / 4, rect.height / 4);
+        const halfBase = Math.min(6, rect.width / 8, rect.height / 8);
+        const insetX = Math.min(radius + halfBase, rect.width / 2);
+        const insetY = Math.min(radius + halfBase, rect.height / 2);
+        const candidates = [
+            { edge: 'top', x: Math.max(left + insetX, Math.min(right - insetX, anchor.x)), y: top },
+            { edge: 'bottom', x: Math.max(left + insetX, Math.min(right - insetX, anchor.x)), y: bottom },
+            { edge: 'left', x: left, y: Math.max(top + insetY, Math.min(bottom - insetY, anchor.y)) },
+            { edge: 'right', x: right, y: Math.max(top + insetY, Math.min(bottom - insetY, anchor.y)) }
+        ];
+        candidates.forEach(point => point.distance = Math.hypot(anchor.x - point.x, anchor.y - point.y));
+        candidates.sort((a, b) => a.distance - b.distance);
+        const edge = candidates[0].edge;
+        let a, b;
+        if (edge === 'top' || edge === 'bottom') {
+            const x = candidates[0].x;
+            a = { x: x - halfBase, y: candidates[0].y };
+            b = { x: x + halfBase, y: candidates[0].y };
+        } else {
+            const y = candidates[0].y;
+            a = { x: candidates[0].x, y: y - halfBase };
+            b = { x: candidates[0].x, y: y + halfBase };
+        }
+        const n = v => Number(v.toFixed(3));
+        const commands = [`M ${n(left + radius)} ${n(top)}`];
+        if (edge === 'top') commands.push(`L ${n(a.x)} ${n(top)}`, `L ${n(anchor.x)} ${n(anchor.y)}`, `L ${n(b.x)} ${n(top)}`);
+        commands.push(`L ${n(right - radius)} ${n(top)}`, `Q ${n(right)} ${n(top)} ${n(right)} ${n(top + radius)}`);
+        if (edge === 'right') commands.push(`L ${n(right)} ${n(a.y)}`, `L ${n(anchor.x)} ${n(anchor.y)}`, `L ${n(right)} ${n(b.y)}`);
+        commands.push(`L ${n(right)} ${n(bottom - radius)}`, `Q ${n(right)} ${n(bottom)} ${n(right - radius)} ${n(bottom)}`);
+        if (edge === 'bottom') commands.push(`L ${n(b.x)} ${n(bottom)}`, `L ${n(anchor.x)} ${n(anchor.y)}`, `L ${n(a.x)} ${n(bottom)}`);
+        commands.push(`L ${n(left + radius)} ${n(bottom)}`, `Q ${n(left)} ${n(bottom)} ${n(left)} ${n(bottom - radius)}`);
+        if (edge === 'left') commands.push(`L ${n(left)} ${n(b.y)}`, `L ${n(anchor.x)} ${n(anchor.y)}`, `L ${n(left)} ${n(a.y)}`);
+        commands.push(`L ${n(left)} ${n(top + radius)}`, `Q ${n(left)} ${n(top)} ${n(left + radius)} ${n(top)}`, 'Z');
+        return commands.join(' ');
+    }
+
+    function syncCalloutTail(group) {
+        if (!group || group.fuzeTool !== 'callout' || !group.fuzeCalloutId) return;
+        const box = group.getObjects().find(part => part.fuzeCalloutPart === 'box');
+        if (!box) return;
+
+        // Le contour est un objet canvas indépendant du groupe. Ainsi, sa
+        // géométrie peut être recalculée pendant le déplacement sans modifier
+        // les dimensions/l'origine du groupe (source du décalage précédent).
+        const rect = box.getBoundingRect();
+        const oldContour = canvas.getObjects().find(part =>
+            part.fuzeCalloutId === group.fuzeCalloutId && part.fuzeCalloutPart === 'contour');
+        if (oldContour) canvas.remove(oldContour);
+
+        const contour = new fabric.Path(getCalloutContourPath(rect, group.fuzeCalloutAnchor), {
+            fill: getHighlightFillColor(group.fuzeCalloutColor || '#4751e1', group.fuzeCalloutOpacity ?? 0.3),
+            stroke: group.fuzeCalloutColor || '#4751e1',
+            strokeWidth: group.fuzeCalloutStrokeWidth || 2,
+            strokeUniform: true, strokeLineJoin: 'round', strokeLineCap: 'round',
+            shadow: makeOuterShapeShadow(), objectCaching: false,
+            selectable: false, evented: false, originX: 'left', originY: 'top'
+        });
+        contour.fuzeCalloutPart = 'contour';
+        contour.fuzeCalloutId = group.fuzeCalloutId;
+
+        // Le contour doit rester immédiatement sous son groupe. Le groupe
+        // contient la boîte puis le texte : le texte est donc toujours au-dessus.
+        canvas.add(contour);
+        const groupIndex = canvas.getObjects().indexOf(group);
+        canvas.moveObjectTo(contour, Math.max(0, groupIndex));
+        contour.setCoords();
+    }
+
+    function syncCalloutAnchorHandle(group) {
+        if (!group || !group.fuzeCalloutId) return;
+        const handle = canvas.getObjects().find(o =>
+            o.fuzeCalloutId === group.fuzeCalloutId && o.fuzeCalloutRole === "anchor");
+        if (!handle) return;
+        handle.set({ left: group.fuzeCalloutAnchor.x, top: group.fuzeCalloutAnchor.y });
+        handle.setCoords();
+    }
+
+    function refreshCalloutGeometry(group) {
+        syncCalloutTail(group);
+        // La poignée est volontairement laissée à son emplacement absolu :
+        // déplacer/redimensionner la bulle ne déplace jamais son ancrage.
+        syncCalloutAnchorHandle(group);
+        syncCalloutWidthHandle(group);
+        canvas.requestRenderAll();
+    }
+
+    function setCalloutChildPositionFromCanvas(group, child, canvasLeft, canvasTop) {
+        // Fabric.js 6 ne fournit plus Group.toLocalPoint(). Convertir le point
+        // scène vers les coordonnées locales du groupe avec sa matrice inverse.
+        // Les coordonnées locales d'un Group sont centrées sur son origine.
+        const groupMatrix = group.calcTransformMatrix();
+        const inverseGroupMatrix = fabric.util.invertTransform(groupMatrix);
+        const local = fabric.util.transformPoint(
+            new fabric.Point(canvasLeft, canvasTop),
+            inverseGroupMatrix
+        );
+        child.set({ left: local.x, top: local.y });
+        child.setCoords();
+    }
+
+    function layoutCallout(group, fitWidth = false) {
+        if (!group || group.fuzeTool !== 'callout') return;
+        const parts = group.getObjects();
+        const box = parts.find(part => part.fuzeCalloutPart === 'box');
+        const label = parts.find(part => part.fuzeCalloutPart === 'text');
+        if (!box || !label) return;
+        const padX = 14, padY = 10;
+        const currentRect = box.getBoundingRect();
+        const oldWidth = Math.max(70, currentRect.width || box.width || 70);
+
+        label.set({ lineHeight: 0.82, textAlign: 'left', originX: 'left', originY: 'top' });
+        if (fitWidth) {
+            const naturalWidth = Math.max(10, label.calcTextWidth());
+            label.set({ width: naturalWidth + 1 });
+        } else {
+            label.set({ width: Math.max(10, oldWidth - padX * 2) });
+        }
+        label.initDimensions();
+
+        const newWidth = fitWidth ? Math.max(70, label.width + padX * 2) : oldWidth;
+        const newHeight = Math.max(38, label.height + padY * 2);
+        // Conserver le coin supérieur gauche de la boîte dans les coordonnées canvas,
+        // même si le groupe englobe maintenant aussi la longue pointe du callout.
+        box.set({ width: newWidth, height: newHeight });
+        setCalloutChildPositionFromCanvas(group, box,
+            currentRect.left + (box.strokeWidth || 0) / 2,
+            currentRect.top + (box.strokeWidth || 0) / 2);
+        setCalloutChildPositionFromCanvas(group, label,
+            currentRect.left + padX,
+            currentRect.top + padY);
+        group.fuzeCalloutWidth = newWidth;
+        group.setCoords();
+        box.setCoords(); label.setCoords();
+        refreshCalloutGeometry(group);
+    }
+
+    // Poignée de largeur indépendante : les contrôles personnalisés Fabric sur
+    // un Group ne recevaient pas correctement le glissement dans notre canvas.
+    // Cette poignée est un objet canvas séparé, piloté explicitement par les
+    // événements souris, ce qui évite toute dépendance aux contrôles Fabric.
+    function syncCalloutWidthHandle(group) {
+        if (!group || !group.fuzeCalloutId) return;
+        const handle = canvas.getObjects().find(o =>
+            o.fuzeCalloutId === group.fuzeCalloutId && o.fuzeCalloutRole === "width");
+        if (!handle) return;
+        const box = group.getObjects().find(part => part.fuzeCalloutPart === "box");
+        if (!box) return;
+        const rect = box.getBoundingRect();
+        handle.set({ left: rect.left + rect.width, top: rect.top + rect.height / 2 });
+        handle.setCoords();
+        // La bulle est ajoutée après la poignée lors de la création : la
+        // remettre au premier plan garantit qu'elle reste réellement cliquable.
+        if (canvas.bringObjectToFront) canvas.bringObjectToFront(handle);
+    }
+
+    function installCalloutWidthControl(group) {
+        if (!group || !group.fuzeCalloutId) return;
+        // Les poignées Fabric natives sont désactivées : le redimensionnement
+        // est entièrement géré par calloutWidthGesture ci-dessous.
+        group.set({ hasControls: false, hasBorders: false, lockScalingX: true, lockScalingY: true, lockRotation: true });
+        group.controls = {};
+        const existing = canvas.getObjects().find(o =>
+            o.fuzeCalloutId === group.fuzeCalloutId && o.fuzeCalloutRole === "width");
+        if (existing) {
+            syncCalloutWidthHandle(group);
+            return;
+        }
+        const handle = new fabric.Circle({
+            left: 0, top: 0, originX: "center", originY: "center", radius: 6,
+            fill: "#ffffff", stroke: group.fuzeCalloutColor || "#4751e1", strokeWidth: 2,
+            strokeUniform: true, selectable: false, evented: true,
+            hasControls: false, hasBorders: false, objectCaching: false,
+            hoverCursor: "ew-resize", moveCursor: "ew-resize", visible: false
+        });
+        handle.fuzeTool = "callout";
+        handle.fuzeCalloutId = group.fuzeCalloutId;
+        handle.fuzeCalloutRole = "width";
+        canvas.add(handle);
+        syncCalloutWidthHandle(group);
+    }
+
+    function resizeCalloutToWidth(group, width) {
+        if (!group || group.fuzeTool !== 'callout') return;
+        const box = group.getObjects().find(part => part.fuzeCalloutPart === 'box');
+        const label = group.getObjects().find(part => part.fuzeCalloutPart === 'text');
+        if (!box || !label) return;
+        const padX = 14, padY = 10;
+        const rect = box.getBoundingRect();
+        width = Math.max(70, width);
+        const labelWidth = Math.max(10, width - padX * 2);
+        label.set({ width: labelWidth, lineHeight: 0.82 });
+        label.initDimensions();
+        const height = Math.max(38, label.height + padY * 2);
+        box.set({ width, height });
+        // Le bord gauche reste fixe : la poignée ne déplace que le bord droit.
+        setCalloutChildPositionFromCanvas(group, box,
+            rect.left + (box.strokeWidth || 0) / 2,
+            rect.top + (box.strokeWidth || 0) / 2);
+        setCalloutChildPositionFromCanvas(group, label,
+            rect.left + padX,
+            rect.top + padY);
+        group.fuzeCalloutWidth = width;
+        group.fuzeCalloutWidthLocked = true;
+        group.setCoords(); box.setCoords(); label.setCoords();
+        refreshCalloutGeometry(group);
+    }
+
+    // Le redimensionnement utilise les événements Pointer natifs en capture.
+    // Cela évite qu'un premier clic après la sortie de l'édition soit consommé
+    // par la sélection Fabric au lieu de commencer immédiatement le glissement.
+    const calloutPointerCanvas = canvas.upperCanvasEl;
+    function findCalloutWidthHandleAtPointer(event) {
+        const rect = calloutPointerCanvas.getBoundingClientRect();
+        const pointer = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+        const active = canvas.getActiveObject();
+        const handles = canvas.getObjects().filter(o =>
+            o.fuzeCalloutRole === "width");
+        for (const handle of handles) {
+            const owner = canvas.getObjects().find(o => o.fuzeTool === "callout" &&
+                o.fuzeCalloutId === handle.fuzeCalloutId && !o.fuzeCalloutRole);
+            if (!owner || active !== owner) continue;
+            handle.set({ visible: true, evented: true });
+            const screenPoint = fabric.util.transformPoint(
+                new fabric.Point(handle.left, handle.top), canvas.viewportTransform);
+            if (Math.hypot(pointer.x - screenPoint.x, pointer.y - screenPoint.y) <= 14) {
+                return { handle, owner };
+            }
+        }
+        return null;
+    }
+
+    calloutPointerCanvas.addEventListener("pointerdown", event => {
+        if (event.button !== 0 || calloutWidthGesture) return;
+        const hit = findCalloutWidthHandleAtPointer(event);
+        if (!hit) return;
+        const box = hit.owner.getObjects().find(part => part.fuzeCalloutPart === "box");
+        const boxRect = box?.getBoundingRect();
+        if (!boxRect) return;
+        const point = canvas.getScenePoint(event);
+        calloutWidthGesture = { group: hit.owner, startX: point.x, startWidth: boxRect.width };
+        canvas.setActiveObject(hit.owner);
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        try { calloutPointerCanvas.setPointerCapture(event.pointerId); } catch (_) {}
+        canvas.requestRenderAll();
+    }, true);
+
+    calloutPointerCanvas.addEventListener("pointermove", event => {
+        if (!calloutWidthGesture) return;
+        const point = canvas.getScenePoint(event);
+        const gesture = calloutWidthGesture;
+        resizeCalloutToWidth(gesture.group,
+            Math.max(70, gesture.startWidth + point.x - gesture.startX));
+        event.preventDefault();
+        event.stopImmediatePropagation();
+    }, true);
+
+    function finishCalloutWidthPointerGesture(event) {
+        if (!calloutWidthGesture) return;
+        calloutWidthGesture = null;
+        if (event) event.stopImmediatePropagation();
+        saveHistory();
+        canvas.requestRenderAll();
+    }
+    calloutPointerCanvas.addEventListener("pointerup", finishCalloutWidthPointerGesture, true);
+    calloutPointerCanvas.addEventListener("pointercancel", finishCalloutWidthPointerGesture, true);
+
+    function createCalloutAt(anchor) {
+        const color = getColor();
+        const strokeWidth = getStrokeWidth();
+        const opacity = calloutDefaultOpacity;
+        const fontSize = getFontSize();
+        const paddingX = 14, paddingY = 10;
+        const initialText = FUZE_LANGUAGE === "en" ? "Text" : "Texte";
+        const calloutId = `callout-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+        // La boîte est positionnée directement dans les coordonnées de la scène :
+        // son coin supérieur gauche se trouve à (+50, -50) du point d'ancrage.
+        // On ne passe pas par layoutCallout() ici, car le groupe vient d'être
+        // construit et un recalcul local/canvas à ce stade pouvait le décaler.
+        const boxLeft = anchor.x + 50;
+        const boxTop = anchor.y - 50;
+        const initialWidth = 300;
+        const label = new fabric.Textbox(initialText, {
+            left: boxLeft + paddingX, top: boxTop + paddingY,
+            width: initialWidth - paddingX * 2,
+            fontFamily: "Arial", fontSize, fill: "#000000",
+            textAlign: "left", originX: "left", originY: "top",
+            editable: true, splitByGrapheme: false, lineHeight: 0.82, objectCaching: false
+        });
+        label.fuzeCalloutPart = "text";
+        label.fuzeCalloutId = calloutId;
+        label.initDimensions();
+
+        const initialHeight = Math.max(38, label.height + paddingY * 2);
+        const box = new fabric.Rect({
+            left: boxLeft, top: boxTop,
+            width: initialWidth, height: initialHeight,
+            rx: 8, ry: 8,
+            fill: 'rgba(0,0,0,0)',
+            stroke: 'rgba(0,0,0,0)', strokeWidth: 0, objectCaching: false,
+            selectable: false, evented: false, opacity: 0
+        });
+        box.fuzeCalloutPart = "box";
+
+        const callout = new fabric.Group([box, label], {
+            subTargetCheck: true, objectCaching: false,
+            selectable: true, evented: true,
+            hasControls: false, hasBorders: false,
+            lockScalingX: true, lockScalingY: true, lockRotation: true,
+            padding: 0
+        });
+        callout.fuzeTool = "callout";
+        callout.fuzeCalloutId = calloutId;
+        callout.fuzeCalloutAnchor = { x: anchor.x, y: anchor.y };
+        callout.fuzeCalloutColor = color;
+        callout.fuzeCalloutOpacity = opacity;
+        callout.fuzeCalloutStrokeWidth = strokeWidth;
+        callout.fuzeCalloutText = label;
+        callout.fuzeCalloutWidth = initialWidth;
+
+        const anchorHandle = new fabric.Circle({
+            left: anchor.x, top: anchor.y, originX: "center", originY: "center",
+            radius: 4, fill: "#ffffff", stroke: color, strokeWidth: 1.5,
+            strokeUniform: true, selectable: true, evented: true,
+            hasControls: false, hasBorders: false, lockScalingX: true,
+            lockScalingY: true, lockRotation: true, objectCaching: false,
+            hoverCursor: "move", moveCursor: "move", visible: false, visible: false
+        });
+        anchorHandle.fuzeCalloutId = calloutId;
+        anchorHandle.fuzeCalloutRole = "anchor";
+
+        canvas.add(callout);
+        syncCalloutTail(callout);
+        installCalloutWidthControl(callout);
+        canvas.add(anchorHandle);
+        canvas.setActiveObject(callout);
+        trackEvent("element_created", { element_type: "callout" });
+        canvas.requestRenderAll();
+        saveHistory();
+        updateEmptyMessage();
+        requestAnimationFrame(() => {
+            if (!canvas.getObjects().includes(callout)) return;
+            try {
+                canvas.setActiveObject(callout);
+                label.enterEditing();
+                label.selectAll();
+                canvas.requestRenderAll();
+            } catch (_) {}
+        });
+        updateStatus(FUZE_LANGUAGE === "en" ? "Enter the callout text" : "Saisissez le texte de la bulle");
+    }
+
+    function autoResizeCalloutFromText(text) {
+        const calloutId = text?.fuzeCalloutId;
+        if (!calloutId) return null;
+        const group = canvas.getObjects().find(o =>
+            o.fuzeTool === "callout" && o.fuzeCalloutId === calloutId && !o.fuzeCalloutRole);
+        if (!group) return null;
+        layoutCallout(group, !group.fuzeCalloutWidthLocked);
+        canvas.requestRenderAll();
+        return group;
+    }
+
+    // Appelé par le panneau de propriétés lorsque la taille de police change.
+    window.fuzeAutoResizeCalloutFromText = autoResizeCalloutFromText;
+
     let curvedArrowStage = 0;
     let curvedArrowStart = null;
     let curvedArrowEnd = null;
@@ -3263,6 +3697,13 @@
             } else {
                 updateStatus("Impossible de prélever cette couleur.");
             }
+            return;
+        }
+
+        // Callout : un seul clic fixe l’ancrage, crée une bulle standard et ouvre l’édition.
+        if (currentTool === "callout") {
+            const point = canvas.getScenePoint(event.e);
+            createCalloutAt(point);
             return;
         }
 
@@ -3339,6 +3780,19 @@
         // que le bouton reste enfoncé. Notre curseur move doit rester affiché.
         if (objectMoveCursorActive) scheduleObjectMoveCursorUpdate();
 
+        if (currentTool === "callout" && calloutDragStart && calloutPreview) {
+            const point = canvas.getScenePoint(event.e);
+            calloutPreview.set({
+                left: Math.min(calloutDragStart.x, point.x),
+                top: Math.min(calloutDragStart.y, point.y),
+                width: Math.max(1, Math.abs(point.x - calloutDragStart.x)),
+                height: Math.max(1, Math.abs(point.y - calloutDragStart.y))
+            });
+            calloutPreview.setCoords();
+            canvas.requestRenderAll();
+            return;
+        }
+
         if (pendingObjectGesture) {
             const gesture = pendingObjectGesture;
             const dxScreen = event.e.clientX - gesture.clientX;
@@ -3355,20 +3809,9 @@
                 }
             }
 
-            if (gesture.moved && canvas.getObjects().includes(gesture.target)) {
-                const point = canvas.getScenePoint(event.e);
-                gesture.target.set({
-                    left: gesture.target.left + (point.x - gesture.lastX),
-                    top: gesture.target.top + (point.y - gesture.lastY)
-                });
-                gesture.lastX = point.x;
-                gesture.lastY = point.y;
-                gesture.target.setCoords();
-                if (gesture.target.fuzeMagnifierId && typeof syncMagnifierGeometry === "function") {
-                    syncMagnifierGeometry(gesture.target.fuzeMagnifierId);
-                }
-                canvas.requestRenderAll();
-            }
+            // Fabric déplace déjà la cible pendant ce geste. Ne pas appliquer
+            // une seconde translation manuelle ici : cela doublait le déplacement
+            // et faisait partir la bulle au-delà du curseur.
             return;
         }
 
@@ -3401,6 +3844,92 @@
             objectMoveCursorFrame = 0;
         }
         updateToolCursor(event?.target || null);
+
+        if (currentTool === "callout" && calloutDragStart && calloutPreview) {
+            const point = canvas.getScenePoint(event.e);
+            const left = Math.min(calloutDragStart.x, point.x);
+            const top = Math.min(calloutDragStart.y, point.y);
+            const width = Math.abs(point.x - calloutDragStart.x);
+            const height = Math.abs(point.y - calloutDragStart.y);
+            canvas.remove(calloutPreview);
+            calloutPreview = null;
+            calloutDragStart = null;
+            if (calloutAnchorPreview) canvas.remove(calloutAnchorPreview);
+            calloutAnchorPreview = null;
+            if (width < 20 || height < 18) {
+                calloutStage = 0; calloutAnchor = null;
+                updateStatus(FUZE_LANGUAGE === "en" ? "Callout cancelled: box too small" : "Bulle annulée : boîte trop petite");
+                canvas.requestRenderAll();
+                return;
+            }
+            const color = getColor();
+            const strokeWidth = getStrokeWidth();
+            const opacity = calloutDefaultOpacity;
+            const fill = getHighlightFillColor(color, opacity);
+            const tailFill = color; // intérieur de la flèche opaque, comme son contour
+            const right = left + width, bottom = top + height;
+            const anchor = calloutAnchor || { x: left, y: top };
+            const calloutId = `callout-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            const box = new fabric.Rect({
+                left, top, width, height, rx: 8, ry: 8,
+                fill: 'rgba(0,0,0,0)', stroke: 'rgba(0,0,0,0)', strokeWidth: 0,
+                objectCaching: false, opacity: 0,
+                selectable: false, evented: false
+            });
+            box.fuzeCalloutPart = "box";
+            const label = new fabric.IText(FUZE_LANGUAGE === "en" ? "Text" : "Text", {
+                left: left + 12, top: top + 10, width: Math.max(10, width - 24),
+                fontFamily: "Arial", fontSize: getFontSize(), fill: "#000000",
+                textAlign: "center", originX: "left", originY: "top",
+                editable: true, splitByGrapheme: false, lineHeight: 0.82, objectCaching: false
+            });
+            label.fuzeCalloutPart = "text";
+            label.initDimensions();
+            label.set({ top: top + Math.max(6, (height - label.height) / 2), width: Math.max(10, width - 24) });
+            const group = new fabric.Group([box, label], {
+                subTargetCheck: true, objectCaching: false,
+                transparentCorners: false, cornerStyle: "circle",
+                cornerSize: 10, padding: 0, borderColor: "#555555"
+            });
+            group.fuzeTool = "callout";
+            group.fuzeCalloutId = calloutId;
+            group.fuzeCalloutAnchor = { ...anchor };
+            group.fuzeCalloutColor = color;
+            group.fuzeCalloutOpacity = opacity;
+            group.fuzeCalloutStrokeWidth = strokeWidth;
+            group.fuzeCalloutText = label;
+            group.set({ selectable: true, evented: true });
+            installCalloutWidthControl(group);
+            const anchorHandle = new fabric.Circle({
+                left: anchor.x, top: anchor.y, originX: "center", originY: "center",
+                radius: 4, fill: "#ffffff", stroke: color, strokeWidth: 1.5,
+                strokeUniform: true, selectable: true, evented: true,
+                hasControls: false, hasBorders: false, lockScalingX: true,
+                lockScalingY: true, lockRotation: true, objectCaching: false,
+                hoverCursor: "move", moveCursor: "move"
+            });
+            anchorHandle.fuzeCalloutId = calloutId;
+            anchorHandle.fuzeCalloutRole = "anchor";
+            canvas.add(group);
+            syncCalloutTail(group);
+            installCalloutWidthControl(group);
+            syncCalloutWidthHandle(group);
+            canvas.add(anchorHandle);
+            canvas.setActiveObject(group);
+            calloutStage = 0; calloutAnchor = null;
+            trackEvent("element_created", { element_type: "callout" });
+            canvas.requestRenderAll();
+            saveHistory();
+            updateEmptyMessage();
+            // L'édition est lancée sur le texte enfant ; le double-clic reste
+            // également disponible pour rééditer ultérieurement.
+            requestAnimationFrame(() => {
+                if (!canvas.getObjects().includes(group)) return;
+                try { label.enterEditing(); label.selectAll(); canvas.requestRenderAll(); } catch (_) {}
+            });
+            updateStatus(FUZE_LANGUAGE === "en" ? "Callout created — enter its text" : "Bulle créée — saisissez le texte");
+            return;
+        }
 
         if (pendingObjectGesture) {
             const gesture = pendingObjectGesture;
@@ -3925,6 +4454,25 @@
     HISTORIQUE DE SAISIE DES TEXTES
     ===================================================== */
 
+    // Un double-clic dans une bulle place directement le curseur dans son
+    // texte : aucune boîte de dialogue ou popup de saisie n'est utilisée.
+    canvas.on("mouse:dblclick", event => {
+        const target = event.target;
+        const owner = target?.fuzeTool === "callout" && !target.fuzeCalloutRole
+            ? target
+            : (target?.fuzeCalloutId
+                ? canvas.getObjects().find(item => item.fuzeTool === "callout" &&
+                    item.fuzeCalloutId === target.fuzeCalloutId && !item.fuzeCalloutRole)
+                : null);
+        if (!owner || typeof owner.getObjects !== "function") return;
+        const label = owner.getObjects().find(part => part.fuzeCalloutPart === "text");
+        if (!label) return;
+        canvas.setActiveObject(owner);
+        label.enterEditing();
+        label.selectAll();
+        canvas.requestRenderAll();
+    });
+
     canvas.on("text:editing:entered", event => {
 
         const text = event.target;
@@ -3975,6 +4523,10 @@
 
         if (text !== editingText) return;
 
+        if (text.fuzeCalloutId) {
+            autoResizeCalloutFromText(text);
+        }
+
         if (
             editingTextChanged &&
             !restoringHistory
@@ -4014,6 +4566,28 @@
                 }
             }
 
+            if (object?.fuzeCalloutRole === "anchor") {
+                const owner = canvas.getObjects().find(o =>
+                    o.fuzeTool === "callout" && o.fuzeCalloutId === object.fuzeCalloutId &&
+                    !o.fuzeCalloutRole);
+                if (owner) {
+                    owner.fuzeCalloutAnchor = object.getCenterPoint();
+                    syncCalloutTail(owner);
+                    canvas.requestRenderAll();
+                }
+            } else if (object?.fuzeTool === "callout" && !object.fuzeCalloutRole) {
+                object.set({
+                    hasControls: true, hasBorders: false,
+                    lockScalingX: true, lockScalingY: true, lockRotation: true
+                });
+                installCalloutWidthControl(object);
+                // Le contour est un objet canvas indépendant : on peut donc
+                // recalculer la flèche à chaque mouvement sans changer les
+                // dimensions ni l'origine du groupe déplacé.
+                syncCalloutTail(object);
+                syncCalloutWidthHandle(object);
+            }
+
             if (object && object.type === "image") {
                 syncImageBorder(object);
                 canvas.requestRenderAll();
@@ -4032,6 +4606,11 @@
             const object =
                 event.selected &&
                 event.selected[0];
+
+            canvas.getObjects().filter(part => part.fuzeCalloutRole === "anchor" || part.fuzeCalloutRole === "width").forEach(handle => {
+                const visible = !!object && object.fuzeTool === "callout" && object.fuzeCalloutId === handle.fuzeCalloutId;
+                handle.set({ visible, evented: visible });
+            });
 
 
             if (
@@ -4079,6 +4658,11 @@
                 event.selected &&
                 event.selected[0];
 
+            canvas.getObjects().filter(part => part.fuzeCalloutRole === "anchor" || part.fuzeCalloutRole === "width").forEach(handle => {
+                const visible = !!object && object.fuzeTool === "callout" && object.fuzeCalloutId === handle.fuzeCalloutId;
+                handle.set({ visible, evented: visible });
+            });
+
 
             if (
                 object &&
@@ -4123,6 +4707,7 @@
 
             editingArrow = null;
             hideArrowHandles();
+            canvas.getObjects().filter(part => part.fuzeCalloutRole === "anchor" || part.fuzeCalloutRole === "width").forEach(handle => handle.set({ visible: false, evented: false }));
             syncThicknessControl();
         }
     );
@@ -4286,6 +4871,21 @@
             }
         }
 
+        if (object?.fuzeCalloutRole === "anchor" ||
+            (object?.fuzeTool === "callout" && !object.fuzeCalloutRole)) {
+            const owner = object.fuzeCalloutRole === "anchor"
+                ? canvas.getObjects().find(o => o.fuzeTool === "callout" &&
+                    o.fuzeCalloutId === object.fuzeCalloutId && !o.fuzeCalloutRole)
+                : object;
+            if (owner) {
+                if (object.fuzeCalloutRole === "anchor") {
+                    owner.fuzeCalloutAnchor = object.getCenterPoint();
+                }
+                refreshCalloutGeometry(owner);
+                saveHistory();
+            }
+        }
+
         if (isActiveSelectionObject(object)) {
             // Les coordonnées des flèches ont été mises à jour par delta pendant
             // le déplacement. On ne touche pas à leur géométrie au commit.
@@ -4308,6 +4908,16 @@
         const active =
             canvas.getActiveObjects();
 
+        // Une bulle est composée de la boîte, de sa pointe et de la poignée
+        // d'ancrage : supprimer l'un de ses éléments supprime l'ensemble.
+        const calloutIds = new Set(active
+            .filter(object => object.fuzeCalloutId)
+            .map(object => object.fuzeCalloutId));
+        const expandedActive = [...new Set([
+            ...active,
+            ...canvas.getObjects().filter(object => calloutIds.has(object.fuzeCalloutId))
+        ])];
+
 
         if (!active.length) {
             return;
@@ -4319,7 +4929,7 @@
         canvas.discardActiveObject();
 
 
-        active.forEach(
+        expandedActive.forEach(
             object => {
 
                 canvas.remove(

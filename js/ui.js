@@ -165,6 +165,16 @@ function syncControlsFromSelectedObject() {
         return;
     }
 
+    if (object.fuzeTool === "callout") {
+        if (object.fuzeCalloutColor) colorInput.value = object.fuzeCalloutColor;
+        if (Number.isFinite(object.fuzeCalloutStrokeWidth)) strokeWidthInput.value = String(object.fuzeCalloutStrokeWidth);
+        strokeOpacityInput.value = String(Math.max(10, Math.min(100, Math.round((object.fuzeCalloutOpacity ?? 1) * 100))));
+        updateStrokeOpacityLabel();
+        const label = object.getObjects().find(part => part.fuzeCalloutPart === "text");
+        if (label && Number.isFinite(label.fontSize)) fontSizeInput.value = String(label.fontSize);
+        return;
+    }
+
     if (object.fuzeTool === "number") {
         const parts = object.getObjects();
         const circle = parts.find(item => item.type === "circle");
@@ -417,6 +427,29 @@ function updateSelectedObject(source = null) {
             }
             updatedSelection.push(item);
 
+            if (item.fuzeTool === "callout" && typeof item.getObjects === "function") {
+                const parts = item.getObjects();
+                const box = parts.find(part => part.fuzeCalloutPart === "box");
+                const contour = canvas.getObjects().find(part =>
+                    part.fuzeCalloutId === item.fuzeCalloutId && part.fuzeCalloutPart === "contour");
+                const label = parts.find(part => part.fuzeCalloutPart === "text");
+                const alpha = opacityWasEdited ? newOpacity : (item.fuzeCalloutOpacity ?? 1);
+                const color = colorWasEdited ? newColor : (item.fuzeCalloutColor || newColor);
+                const width = widthWasEdited ? newWidth : (item.fuzeCalloutStrokeWidth || newWidth);
+                const fill = getHighlightFillColor(color, alpha);
+                if (contour) contour.set({ fill, stroke: color, strokeWidth: width });
+                const anchorHandle = canvas.getObjects().find(part =>
+                    part.fuzeCalloutId === item.fuzeCalloutId && part.fuzeCalloutRole === "anchor");
+                if (anchorHandle && colorWasEdited) anchorHandle.set({ stroke: color });
+                if (label) label.set({ fill: "#000000" });
+                if (fontSizeWasEdited && label) label.set({ fontSize: newFontSize });
+                item.fuzeCalloutColor = color; item.fuzeCalloutOpacity = alpha; item.fuzeCalloutStrokeWidth = width;
+                if (opacityWasEdited) window.fuzeSetCalloutDefaultOpacity?.(alpha);
+                if (fontSizeWasEdited && label && window.fuzeAutoResizeCalloutFromText) window.fuzeAutoResizeCalloutFromText(label);
+                item.setCoords();
+                return;
+            }
+
             // Numéro entouré : les propriétés sont portées par le cercle et le texte internes.
             if (item.fuzeTool === "number" && typeof item.getObjects === "function") {
                 const parts = item.getObjects();
@@ -537,6 +570,39 @@ function updateSelectedObject(source = null) {
     if (object.fuzeTool === "number") {
         updateFuzeNumberStyle(object, source);
         syncControlsFromSelectedObject();
+        return;
+    }
+
+    if (object.fuzeTool === "callout" && typeof object.getObjects === "function") {
+        const parts = object.getObjects();
+        const box = parts.find(part => part.fuzeCalloutPart === "box");
+        const contour = canvas.getObjects().find(part =>
+            part.fuzeCalloutId === object.fuzeCalloutId && part.fuzeCalloutPart === "contour");
+        const label = parts.find(part => part.fuzeCalloutPart === "text");
+        const color = source === "color" ? getColor() : (object.fuzeCalloutColor || getColor());
+        const alpha = source === "opacity" ? getStrokeOpacity() : (object.fuzeCalloutOpacity ?? 1);
+        const width = source === "strokeWidth" ? getStrokeWidth() : (object.fuzeCalloutStrokeWidth || getStrokeWidth());
+        const fill = getHighlightFillColor(color, alpha);
+        if (contour) contour.set({ fill, stroke: color, strokeWidth: width });
+        const anchorHandle = canvas.getObjects().find(part =>
+            part.fuzeCalloutId === object.fuzeCalloutId && part.fuzeCalloutRole === "anchor");
+        if (anchorHandle && source === "color") anchorHandle.set({ stroke: color });
+        if (label) {
+            label.set({ fill: "#000000" });
+            if (source === "fontSize") {
+                label.set({ fontSize: getFontSize(), lineHeight: 0.9 });
+                label.initDimensions();
+                if (typeof window.fuzeAutoResizeCalloutFromText === "function") {
+                    window.fuzeAutoResizeCalloutFromText(label);
+                }
+            }
+        }
+        object.fuzeCalloutColor = color;
+        object.fuzeCalloutOpacity = alpha;
+        if (source === "opacity") window.fuzeSetCalloutDefaultOpacity?.(alpha);
+        object.fuzeCalloutStrokeWidth = width;
+        object.setCoords(); canvas.requestRenderAll(); saveHistory();
+        updateStatus(FUZE_LANGUAGE === "en" ? "Callout updated" : "Bulle modifiée");
         return;
     }
 

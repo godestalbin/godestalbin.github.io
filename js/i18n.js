@@ -13,7 +13,7 @@ const FUZE_I18N = {
     fr: {
         file: "Fichier", edit: "Édition", openFuze: "Ouvrir Fuze", saveFuze: "Enregistrer Fuze", help: "Aide", helpFeatures: "Aide et fonctionnalités", openImage: "Ouvrir une image",
         copyAnnotated: "Copier l’image annotée", savePng: "Enregistrer en PNG",
-        clearPanel: "Effacer le canvas", select: "Sélection", text: "Texte", number: "Numéro",
+        clearPanel: "Effacer le canvas", select: "Sélection", text: "Texte", callout: "Bulle", number: "Numéro",
         arrow: "Flèche", simpleArrow: "Flèche simple", curvedArrow: "Flèche courbe", rectangle: "Rectangle", circle: "Cercle", felt: "Feutre",
         highlight: "Highlight", imageSize: "Taille image",
         highlight: "Highlight", blur: "Brouillage", magnifier: "Zoom", border: "Bordure", imageSize: "Taille image",
@@ -31,7 +31,7 @@ const FUZE_I18N = {
     en: {
         file: "File", edit: "Edit", openFuze: "Open Fuze", saveFuze: "Save Fuze", help: "Help", helpFeatures: "Help & features", openImage: "Open image",
         copyAnnotated: "Copy annotated image", savePng: "Save as PNG",
-        clearPanel: "Clear canvas", select: "Select", text: "Text", number: "Number",
+        clearPanel: "Clear canvas", select: "Select", text: "Text", callout: "Callout", number: "Number",
         arrow: "Arrow", simpleArrow: "Simple arrow", curvedArrow: "Curved arrow", rectangle: "Rectangle", circle: "Circle", felt: "Felt",
         highlight: "Highlight", border: "Border", imageSize: "Image size",
         highlight: "Highlight", blur: "Blur", magnifier: "Zoom", imageSize: "Image size",
@@ -72,7 +72,7 @@ function applyFuzeLanguage() {
         ['[data-action="copy-png"]', 'copyAnnotated'],
         ['[data-action="save-png"]', 'savePng'],
         ['[data-action="clear-panel"]', 'clearPanel'],
-        ['[data-tool="select"]', 'select'], ['[data-tool="text"]', 'text'], ['[data-tool="number"]', 'number'],
+        ['[data-tool="select"]', 'select'], ['[data-tool="text"]', 'text'], ['[data-tool="callout"]', 'callout'], ['[data-tool="number"]', 'number'],
         ['[data-tool="arrow"]', 'arrow'], ['[data-tool="simpleArrow"]', 'simpleArrow'], ['[data-tool="curvedArrow"]', 'curvedArrow'], ['[data-tool="rectangle"]', 'rectangle'],
         ['[data-tool="circle"]', 'circle'], ['[data-tool="felt"]', 'felt'],
         ['[data-tool="highlight"]', 'highlight'],

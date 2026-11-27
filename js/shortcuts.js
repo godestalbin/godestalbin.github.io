@@ -805,6 +805,7 @@ document.addEventListener("keydown", event => {
         const toolByKey = {
             s: "select",
             t: "text",
+            k: "callout",
             n: "number",
             a: "arrow",
             q: "curvedArrow",

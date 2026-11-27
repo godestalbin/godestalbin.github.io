@@ -41,6 +41,21 @@ function getMagnifierBorderParts(object) {
     };
 }
 
+function getMagnifierCornerRadius(object) {
+    if (!object) return 0;
+    // Le rayon est exprimé dans le repère du canvas, comme le rectangle de cadre.
+    // Pour la lentille, le rayon du clipPath est multiplié par l'échelle de l'image.
+    const scaleX = Math.abs(Number(object.scaleX) || 1);
+    const scaleY = Math.abs(Number(object.scaleY) || 1);
+    const clip = object.fuzeMagnifierRole === "lens" ? object.clipPath : null;
+    const localRadius = clip
+        ? Math.min(Number(clip.rx) || 0, Number(clip.ry) || 0)
+        : Math.min(Number(object.rx) || 0, Number(object.ry) || 0);
+    const radius = localRadius * Math.min(scaleX, scaleY);
+    const bounds = object.getBoundingRect();
+    return Math.max(0, Math.min(radius, bounds.width / 2, bounds.height / 2));
+}
+
 function syncMagnifierBorder(object) {
     if (!object || !["source", "lens"].includes(object.fuzeMagnifierRole)) return;
     const { shadow } = getMagnifierBorderParts(object);
@@ -49,30 +64,27 @@ function syncMagnifierBorder(object) {
     const frameWidth = object.fuzeMagnifierBorderEnabled === false
         ? 1
         : Math.max(1, Number(object.fuzeMagnifierBorderWidth) || 1);
-    // Décaler le trait d'une demi-épaisseur vers le haut et la gauche,
-    // sans déplacer ni redimensionner le cadre de sélection.
-    // Le cadre est un support opaque placé derrière l'image : celle-ci en
-    // masque le centre et laisse apparaître un liseré régulier. Le support
-    // déborde aussi de l'image afin que l'ombre soit visible à l'extérieur.
-    const frameWidthPx = Math.max(1, frameWidth);
-    const frameHeightPx = Math.max(1, frameWidth);
-    const radius = Math.min(14, Math.max(4, Math.min(bounds.width, bounds.height) * 0.04));
+    const radius = getMagnifierCornerRadius(object);
     const frameColor = magnifierRgba(
         object.fuzeMagnifierBorderColor || "#4673d2",
         object.fuzeMagnifierBorderEnabled === false ? 0.85 : (object.fuzeMagnifierBorderOpacity ?? 1)
     );
+    // Un contour transparent (et non un rectangle plein) évite que le cadre
+    // puisse masquer l'image de la lentille lorsque Fabric recalcule son clipPath.
+    // Le rayon reprend exactement celui de la forme réellement affichée.
     shadow.set({
-        left: bounds.left - frameWidthPx, top: bounds.top - frameHeightPx,
-        width: bounds.width + frameWidthPx * 2,
-        height: bounds.height + frameHeightPx * 2,
-        rx: radius + frameWidthPx, ry: radius + frameHeightPx,
+        left: bounds.left, top: bounds.top,
+        width: bounds.width, height: bounds.height,
+        rx: radius, ry: radius,
         originX: "left", originY: "top",
-        fill: frameColor, stroke: null, strokeWidth: 0,
+        fill: "rgba(0,0,0,0)",
+        stroke: frameColor, strokeWidth: frameWidth,
+        strokeUniform: true,
         shadow: makeMagnifierOuterShadow(), visible: true
     });
-    // Le support doit rester juste derrière la lentille, jamais au-dessus.
+    // Le contour est dessiné au-dessus de l'image, mais son centre reste transparent.
     const objectIndex = canvas.getObjects().indexOf(object);
-    if (objectIndex >= 0) canvas.moveObjectTo(shadow, objectIndex);
+    if (objectIndex >= 0) canvas.moveObjectTo(shadow, objectIndex + 1);
     shadow.setCoords();
 }
 
@@ -102,8 +114,6 @@ function setMagnifierBorderStyle(object, color, width, opacity) {
     object.setCoords();
     const { shadow } = getMagnifierBorderParts(object);
     if (shadow) {
-        const frameColor = magnifierRgba(object.fuzeMagnifierBorderColor, object.fuzeMagnifierBorderEnabled ? object.fuzeMagnifierBorderOpacity : 0.85);
-        shadow.set({ stroke: frameColor, strokeWidth: object.fuzeMagnifierBorderEnabled ? object.fuzeMagnifierBorderWidth : 1, visible: true });
         syncMagnifierBorder(object);
     }
     const { lens, connector } = getMagnifierParts(object.fuzeMagnifierId);
@@ -170,11 +180,6 @@ function restoreMagnifierDecorations() {
         object.setCoords();
         const { shadow } = getMagnifierBorderParts(object);
         if (shadow && object.fuzeMagnifierRole === "lens") {
-            shadow.set({
-                stroke: magnifierRgba(object.fuzeMagnifierBorderColor, object.fuzeMagnifierBorderEnabled ? object.fuzeMagnifierBorderOpacity : 0.85),
-                strokeWidth: object.fuzeMagnifierBorderEnabled ? object.fuzeMagnifierBorderWidth : 1,
-                visible: true
-            });
             syncMagnifierBorder(object);
         }
     });
@@ -191,28 +196,28 @@ function createMagnifierBorder(object, role, enabled, withShadow = false) {
     });
     if (withShadow) {
         const bounds = object.getBoundingRect();
-        const radius = Math.min(14, Math.max(4, Math.min(bounds.width, bounds.height) * 0.04));
+        const radius = getMagnifierCornerRadius(object);
         const frameWidth = object.fuzeMagnifierBorderEnabled === false ? 1 : Math.max(1, Number(object.fuzeMagnifierBorderWidth) || 1);
         const shadow = new fabric.Rect({
-            left: bounds.left - frameWidth,
-            top: bounds.top - frameWidth,
-            width: bounds.width + frameWidth * 2,
-            height: bounds.height + frameWidth * 2,
+            left: bounds.left,
+            top: bounds.top,
+            width: bounds.width,
+            height: bounds.height,
             originX: "left", originY: "top",
-            rx: radius + frameWidth,
-            ry: radius + frameWidth,
-            fill: magnifierRgba(object.fuzeMagnifierBorderColor || "#4673d2", object.fuzeMagnifierBorderEnabled === false ? 0.85 : (object.fuzeMagnifierBorderOpacity ?? 1)),
-            stroke: null,
-            strokeWidth: 0,
+            rx: radius,
+            ry: radius,
+            fill: "rgba(0,0,0,0)",
+            stroke: magnifierRgba(object.fuzeMagnifierBorderColor || "#4673d2", object.fuzeMagnifierBorderEnabled === false ? 0.85 : (object.fuzeMagnifierBorderOpacity ?? 1)),
+            strokeWidth: frameWidth,
+            strokeUniform: true,
             shadow: makeMagnifierOuterShadow(),
             selectable: false, evented: false, hasControls: false, hasBorders: false,
             objectCaching: false, fuzeMagnifierId: object.fuzeMagnifierId,
             fuzeMagnifierRole: `${role}-shadow`
         });
         canvas.add(shadow);
-        // Le support coloré et ombré reste derrière l'image ; son débord
-        // forme le contour visible sans masquer le contenu de la lentille.
-        canvas.moveObjectTo(shadow, canvas.getObjects().indexOf(object));
+        // Le contour transparent reste au-dessus de l'image sans la recouvrir.
+        canvas.moveObjectTo(shadow, canvas.getObjects().indexOf(object) + 1);
     }
 }
 
